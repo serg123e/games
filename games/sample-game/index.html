@@ -73,6 +73,20 @@
             font-size: 18px;
             margin-top: 20px;
         }
+
+        /* Animation for score pulse */
+        .score-pulse {
+            animation: pulse 0.1s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+        }
     </style>
 </head>
 <body>
@@ -114,10 +128,10 @@
             score++;
             scoreElement.textContent = score;
             
-            // Add animation
-            scoreElement.style.transform = 'scale(1.2)';
+            // Add animation with CSS class
+            scoreElement.classList.add('score-pulse');
             setTimeout(() => {
-                scoreElement.style.transform = 'scale(1)';
+                scoreElement.classList.remove('score-pulse');
             }, 100);
 
             // Update high score

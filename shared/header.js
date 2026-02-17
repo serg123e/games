@@ -17,7 +17,11 @@
         backButton.className = 'back-button';
         backButton.innerHTML = '← Back to Games';
         backButton.onclick = function() {
-            window.location.href = '/';
+            // Navigate to root index.html - works with subdirectories and GitHub Pages
+            const pathParts = window.location.pathname.split('/').filter(Boolean);
+            const depth = pathParts.length - 1; // Subtract 1 for index.html
+            const backPath = depth > 0 ? '../'.repeat(depth) + 'index.html' : './index.html';
+            window.location.href = backPath;
         };
         
         // Create title
