@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample Game - Click Counter</title>
+    
+    <!-- Include shared header styles -->
+    <link rel="stylesheet" href="../../shared/header.css">
+    
+    <style>
+        /* Game-specific styles */
+        .game-container {
+            text-align: center;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 40px;
+        }
+
+        .score {
+            font-size: 72px;
+            color: #667eea;
+            font-weight: bold;
+            margin: 30px 0;
+        }
+
+        .click-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 30px 60px;
+            border-radius: 50px;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .click-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .click-button:active {
+            transform: scale(0.95);
+        }
+
+        .reset-button {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .reset-button:hover {
+            background: #c0392b;
+        }
+
+        .instructions {
+            color: #666;
+            margin: 20px 0;
+            font-size: 18px;
+        }
+
+        .high-score {
+            color: #764ba2;
+            font-size: 18px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- The header will be automatically injected here by header.js -->
+    
+    <div class="game-container">
+        <h2>Click Counter Game</h2>
+        <p class="instructions">Click the button as many times as you can!</p>
+        
+        <div class="score" id="score">0</div>
+        
+        <button class="click-button" id="clickBtn">Click Me!</button>
+        
+        <div>
+            <button class="reset-button" id="resetBtn">Reset Counter</button>
+        </div>
+        
+        <div class="high-score" id="highScore">High Score: 0</div>
+    </div>
+
+    <!-- Include shared header script -->
+    <script src="../../shared/header.js"></script>
+    
+    <!-- Game logic -->
+    <script>
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('clickCounterHighScore')) || 0;
+
+        const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('highScore');
+        const clickBtn = document.getElementById('clickBtn');
+        const resetBtn = document.getElementById('resetBtn');
+
+        // Update high score display
+        highScoreElement.textContent = `High Score: ${highScore}`;
+
+        // Click event
+        clickBtn.addEventListener('click', function() {
+            score++;
+            scoreElement.textContent = score;
+            
+            // Add animation
+            scoreElement.style.transform = 'scale(1.2)';
+            setTimeout(() => {
+                scoreElement.style.transform = 'scale(1)';
+            }, 100);
+
+            // Update high score
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('clickCounterHighScore', highScore);
+                highScoreElement.textContent = `High Score: ${highScore}`;
+            }
+        });
+
+        // Reset event
+        resetBtn.addEventListener('click', function() {
+            score = 0;
+            scoreElement.textContent = score;
+        });
+    </script>
+</body>
+</html>

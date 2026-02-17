@@ -1,0 +1,93 @@
+/**
+ * Game Header Styles
+ * Include this file in your game HTML to style the navigation header
+ * Usage: Add <link rel="stylesheet" href="../shared/header.css"> in your HTML
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding-top: 80px; /* Space for fixed header */
+}
+
+.game-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+}
+
+.back-button {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.back-button:hover {
+    background: #5568d3;
+    transform: translateX(-3px);
+}
+
+.back-button:active {
+    transform: scale(0.95);
+}
+
+.game-title {
+    margin-left: 30px;
+    font-size: 28px;
+    color: #333;
+    font-weight: 600;
+}
+
+/* Game container suggestions */
+.game-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    body {
+        padding-top: 70px;
+    }
+    
+    .game-header {
+        height: 60px;
+        padding: 0 10px;
+    }
+    
+    .back-button {
+        padding: 8px 15px;
+        font-size: 14px;
+    }
+    
+    .game-title {
+        font-size: 20px;
+        margin-left: 15px;
+    }
+}
