@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Котик Тыгыдык</title>
+<link rel="stylesheet" href="../../shared/header.css">
+<style>
+  body {
+    min-height:100vh; min-height:100dvh;
+    background:linear-gradient(135deg,#fef3c7 0%,#fde68a 30%,#fbbf24 100%);
+    font-family:-apple-system,'Segoe UI',system-ui,sans-serif;
+    color:#44403c; display:flex; flex-direction:column; align-items:center;
+    padding:90px 12px 20px; overflow-x:hidden;
+  }
+  .game-header{background:rgba(254,243,199,.95);box-shadow:0 2px 10px rgba(0,0,0,.1);}
+  .game-title{color:#92400e;}
+  .back-button{background:linear-gradient(135deg,#f59e0b,#d97706);}
+  .back-button:hover{background:linear-gradient(135deg,#d97706,#b45309);}
+
+  .g{max-width:420px;width:100%;margin:0 auto;}
+
+  /* Resources bar */
+  .res-bar{display:flex;gap:8px;justify-content:center;margin-bottom:10px;flex-wrap:wrap;}
+  .res-item{background:rgba(255,255,255,.7);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px;border:1px solid rgba(0,0,0,.06);}
+
+  /* Cat area */
+  .cat-area{position:relative;background:linear-gradient(180deg,#fffbeb,#fef3c7);border-radius:24px;padding:20px;text-align:center;margin-bottom:12px;min-height:200px;border:2px solid rgba(217,119,6,.15);overflow:hidden;}
+  .cat-emoji{font-size:80px;transition:transform .3s;position:relative;z-index:2;display:inline-block;}
+  .cat-emoji.bounce{animation:bounce .5s ease;}
+  .cat-emoji.tygydyk{animation:tygydyk .3s ease infinite;}
+  .cat-emoji.purr{animation:purr .4s ease infinite;}
+  .cat-emoji.sick{filter:saturate(.5) brightness(.9);}
+
+  .bubble{position:relative;background:#fff;border-radius:16px;padding:10px 16px;margin:0 auto 12px;max-width:280px;font-size:14px;font-weight:600;color:#78350f;box-shadow:0 2px 8px rgba(0,0,0,.06);min-height:40px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.05);}
+  .bubble::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #fff;}
+
+  /* Fur particles */
+  .fur{position:absolute;font-size:10px;pointer-events:none;z-index:1;opacity:.6;}
+
+  /* Stats */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;}
+  .stat{background:rgba(255,255,255,.6);border-radius:12px;padding:8px 10px;border:1px solid rgba(0,0,0,.05);}
+  .stat-label{font-size:11px;color:#92400e;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:4px;}
+  .stat-bar{height:8px;background:rgba(0,0,0,.08);border-radius:4px;overflow:hidden;}
+  .stat-fill{height:100%;border-radius:4px;transition:width .5s ease, background .3s;}
+  .stat-fill.green{background:linear-gradient(90deg,#22c55e,#4ade80);}
+  .stat-fill.yellow{background:linear-gradient(90deg,#eab308,#facc15);}
+  .stat-fill.orange{background:linear-gradient(90deg,#f97316,#fb923c);}
+  .stat-fill.red{background:linear-gradient(90deg,#ef4444,#f87171);}
+
+  /* Action buttons */
+  .actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+  .act-btn{border:none;cursor:pointer;background:rgba(255,255,255,.8);border-radius:14px;padding:12px 6px;text-align:center;font-size:12px;font-weight:600;color:#78350f;transition:all .2s;border:1px solid rgba(0,0,0,.06);font-family:inherit;-webkit-appearance:none;}
+  .act-btn:active{transform:scale(.95);}
+  .act-btn:disabled{opacity:.4;cursor:default;transform:none;}
+  .act-btn .act-icon{font-size:24px;display:block;margin-bottom:3px;}
+  .act-btn:hover:not(:disabled){background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+  .act-btn.shop{background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid #f59e0b;}
+  .act-btn.heal{background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:1px solid #22c55e;}
+
+  /* Event log */
+  .log{background:rgba(255,255,255,.5);border-radius:14px;padding:10px 14px;max-height:100px;overflow-y:auto;border:1px solid rgba(0,0,0,.05);}
+  .log-entry{font-size:12px;color:#78350f;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);display:flex;gap:6px;}
+  .log-entry:last-child{border-bottom:none;}
+  .log-time{color:#a8a29e;flex-shrink:0;}
+
+  /* Tygydyk overlay */
+  .tygydyk-overlay{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:50;}
+  .tygydyk-paw{position:absolute;font-size:30px;animation:pawFly 1s ease forwards;pointer-events:none;}
+
+  /* Status badges */
+  .status-badges{display:flex;gap:6px;justify-content:center;margin-bottom:8px;flex-wrap:wrap;}
+  .badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;}
+  .badge.sick{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;}
+  .badge.bored{background:#e0e7ff;color:#4338ca;border:1px solid #a5b4fc;}
+  .badge.tygydyk-badge{background:#fef3c7;color:#d97706;border:1px solid #fcd34d;animation:pulse .5s ease infinite;}
+  .badge.happy{background:#dcfce7;color:#16a34a;border:1px solid #86efac;}
+
+  /* Game over */
+  .game-over{text-align:center;padding:40px 20px;}
+  .game-over h2{font-size:28px;color:#dc2626;margin-bottom:12px;}
+
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+  @keyframes tygydyk{0%{transform:translate(0,0) rotate(0)}25%{transform:translate(30px,-15px) rotate(15deg)}50%{transform:translate(-20px,-10px) rotate(-10deg)}75%{transform:translate(25px,5px) rotate(8deg)}100%{transform:translate(0,0) rotate(0)}}
+  @keyframes purr{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  @keyframes pawFly{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(360deg)}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes floatFur{0%{transform:translateY(0) rotate(0);opacity:.6}100%{transform:translateY(60px) rotate(180deg);opacity:0}}
+</style>
+</head>
+<body>
+<script src="../../shared/header.js"></script>
+
+<div class="g" id="app"></div>
+
+<script>
+'use strict';
+
+/* ───── DATA ───── */
+const PHRASES = {
+  idle: ["Мяу.","Угу.","Ладно.","...","Мррр.","*смотрит в стену*","*сидит*","Ну и чё.","Кыс.","*моргает*","Хвост.","*зевает*"],
+  hungry: ["Еды.","Корм. Где.","Миска пустая.","Стой. Корм неси.","Голод.","Я УМИРАЮ.","Миску. Мне. Сейчас.","*стучит лапой по миске*","Эй. ЕДА."],
+  thirsty: ["Воды.","Пить.","Кран открой.","*сидит у миски с водой*","Жажда.","Хочу пить. Стой."],
+  bored: ["Скучно.","Погладь.","Эй. Я тут.","Мне скучно. Чеши.","*тыкает лапой*","Внимание. Мне. Дай.","*ложится на клавиатуру*","Почеши пузо. Ладно."],
+  sick: ["Ой.","Плохо мне.","Лечи.","*лежит грустно*","Больно в животе.","Ветеринар... ладно.","Мяу... тихо."],
+  happy: ["МУРРРР.","Хорошо.","Ладно, ты нормальный.","*мурчит*","Нормально живём.","Кыс-кыс. Ладно.","Угу, неплохо."],
+  tygydyk: ["ТЫГЫДЫК ТЫГЫДЫК!!!","АААА БЕГУ!!!","ТЫГЫДЫК-ТЫГЫДЫК-ТЫГЫДЫК!!!","*носится по стенам*","ШКАФ! СТОЛ! ДИВАН!","НЕ ОСТАНОВИТЬ!!!","ТЫГЫДЫЫЫЫК!!!","*сбивает всё на пути*"],
+  fed: ["Угу. Сойдёт.","*чавкает*","Ладно, вкусно.","Нормальный корм.","Ещё бы.","*ест*"],
+  watered: ["Буль-буль.","*лакает*","Вода. Ладно.","Хорошая вода."],
+  petted: ["Мурр.","Ладно. Ещё.","*мурчит громко*","Вот тут чеши. ДА. ТУТ.","Угу... хорошо...","*подставляет пузо*"],
+  cleaned: ["Ладно, чисто.","*нюхает лоток*","Сойдёт.","Угу, нормально."],
+  brushed: ["Не тяни!","Ладно, чеши.","*терпит*","Мурр... осторожнее.","Шерсть моя. Ладно, бери."],
+  healed: ["Ой... полегчало.","Угу. Лучше.","*отряхивается*","Ладно. Живу дальше."],
+  noFood: ["Корм кончился! Купи!","Пусто! КОРМ!","*стучит по пустой миске*"],
+  noMoney: ["Денег нет. Работай.","Заработай сначала."]
+};
+
+const CAT_FACES = {
+  normal: "😺", happy: "😸", hungry: "😿", sick: "🤒",
+  tygydyk: "🙀", sleeping: "😴", angry: "😾", love: "😻", bored: "😐"
+};
+
+/* ───── STATE ───── */
+let S = {};
+function initState() {
+  S = {
+    hunger: 80, water: 80, mood: 70, health: 100,
+    litter: 90, fur: 85,
+    coins: 30, food: 5, medicine: 1,
+    alive: true, started: false,
+    tygydykActive: false, isSick: false,
+    tick: 0, totalTicks: 0,
+    log: [], phrase: "Мяу. Привет.", catFace: CAT_FACES.normal,
+    lastTygydyk: 0, furParticles: [],
+    daysSurvived: 0, mousesCaught: 0
+  };
+}
+initState();
+
+/* ───── HELPERS ───── */
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const clamp = (v, lo=0, hi=100) => Math.max(lo, Math.min(hi, v));
+
+function addLog(msg) {
+  const m = Math.floor(S.totalTicks / 20);
+  const h = Math.floor(m / 60);
+  const time = (h > 0 ? h+'ч ' : '') + (m % 60) + 'м';
+  S.log.unshift({ time, msg });
+  if (S.log.length > 30) S.log.pop();
+}
+
+function say(category) {
+  S.phrase = pick(PHRASES[category] || PHRASES.idle);
+}
+
+function statColor(val) {
+  if (val > 60) return 'green';
+  if (val > 35) return 'yellow';
+  if (val > 15) return 'orange';
+  return 'red';
+}
+
+/* ───── GAME LOGIC ───── */
+function gameTick() {
+  if (!S.alive || !S.started) return;
+  S.tick++;
+  S.totalTicks++;
+
+  // Decay stats
+  S.hunger = clamp(S.hunger - 1.2);
+  S.water = clamp(S.water - 1.5);
+  S.mood = clamp(S.mood - 0.6);
+  S.litter = clamp(S.litter - 0.8);
+  S.fur = clamp(S.fur - 0.3);
+
+  // Health effects
+  if (S.hunger < 15) S.health = clamp(S.health - 1.5);
+  if (S.water < 15) S.health = clamp(S.health - 2);
+  if (S.litter < 15) S.health = clamp(S.health - 0.5);
+  if (S.fur < 15) S.health = clamp(S.health - 0.3);
+  // Natural health regen when everything is OK
+  if (S.hunger > 60 && S.water > 60 && S.litter > 50 && S.fur > 50 && !S.isSick) {
+    S.health = clamp(S.health + 0.3);
+  }
+
+  // Sick check
+  if (S.health < 30 && !S.isSick) {
+    S.isSick = true;
+    say('sick');
+    addLog('🤒 Котик заболел!');
+  }
+  if (S.isSick) {
+    S.mood = clamp(S.mood - 0.5);
+    S.health = clamp(S.health - 0.4);
+  }
+
+  // Earn coins (catching mice)
+  if (S.tick % 8 === 0 && S.health > 20 && !S.isSick) {
+    const earned = Math.random() < 0.4 ? 3 : 1;
+    S.coins += earned;
+    if (earned >= 3) {
+      S.mousesCaught++;
+      addLog('🐭 Котик поймал мышь! +' + earned + '💰');
+    }
+  }
+
+  // Day counter
+  if (S.totalTicks % 120 === 0) {
+    S.daysSurvived++;
+    addLog('🌅 Прошёл день ' + S.daysSurvived);
+  }
+
+  // Tygydyk event
+  if (!S.tygydykActive && S.health > 20 && !S.isSick && S.totalTicks - S.lastTygydyk > 25) {
+    if (Math.random() < 0.04) startTygydyk();
+  }
+
+  // Auto-phrases
+  if (S.tick % 6 === 0) {
+    if (S.tygydykActive) say('tygydyk');
+    else if (S.isSick) say('sick');
+    else if (S.hunger < 20) say('hungry');
+    else if (S.water < 20) say('thirsty');
+    else if (S.mood < 25) say('bored');
+    else if (S.mood > 75 && S.health > 70) say('happy');
+    else say('idle');
+  }
+
+  // Update cat face
+  updateCatFace();
+
+  // Death check
+  if (S.health <= 0) {
+    S.alive = false;
+    S.phrase = "...мяу... прощай...";
+    S.catFace = "😿";
+    addLog('💔 Котик ушёл на радугу...');
+  }
+
+  render();
+}
+
+function updateCatFace() {
+  if (S.tygydykActive) S.catFace = CAT_FACES.tygydyk;
+  else if (S.isSick) S.catFace = CAT_FACES.sick;
+  else if (S.hunger < 15) S.catFace = CAT_FACES.hungry;
+  else if (S.mood < 20) S.catFace = CAT_FACES.bored;
+  else if (S.mood > 80 && S.health > 70) S.catFace = CAT_FACES.happy;
+  else S.catFace = CAT_FACES.normal;
+}
+
+function startTygydyk() {
+  S.tygydykActive = true;
+  S.lastTygydyk = S.totalTicks;
+  say('tygydyk');
+  addLog('💥 ТЫГЫДЫК! Котик носится по квартире!');
+  S.fur = clamp(S.fur - 15);
+  S.litter = clamp(S.litter - 10);
+  S.mood = clamp(S.mood + 20);
+
+  // Spawn fur particles
+  for (let i = 0; i < 6; i++) {
+    S.furParticles.push({ id: Date.now() + i, x: 20 + Math.random() * 60, y: 10 + Math.random() * 40 });
+  }
+
+  setTimeout(() => {
+    S.tygydykActive = false;
+    say('idle');
+    addLog('😺 Котик успокоился. Шерсть повсюду.');
+    render();
+  }, 4000);
+  render();
+}
+
+/* ───── ACTIONS ───── */
+function doFeed() {
+  if (S.food <= 0) { say('noFood'); render(); return; }
+  S.food--;
+  S.hunger = clamp(S.hunger + 35);
+  say('fed');
+  addLog('🍖 Покормили котика');
+  render();
+}
+function doWater() {
+  S.water = clamp(S.water + 40);
+  say('watered');
+  addLog('💧 Напоили котика');
+  render();
+}
+function doPet() {
+  S.mood = clamp(S.mood + 20);
+  say('petted');
+  addLog('🤗 Погладили котика');
+  render();
+}
+function doCleanLitter() {
+  S.litter = clamp(S.litter + 40);
+  say('cleaned');
+  addLog('🧹 Почистили лоток');
+  render();
+}
+function doBrush() {
+  S.fur = clamp(S.fur + 30);
+  S.furParticles = [];
+  say('brushed');
+  addLog('✨ Вычесали шерсть');
+  render();
+}
+function doHeal() {
+  if (S.medicine <= 0) {
+    if (S.coins < 20) { say('noMoney'); render(); return; }
+    S.coins -= 20;
+    addLog('💊 Купили лекарство за 20💰');
+  } else {
+    S.medicine--;
+  }
+  S.health = clamp(S.health + 30);
+  S.isSick = false;
+  say('healed');
+  addLog('💊 Полечили котика');
+  render();
+}
+function doBuyFood() {
+  if (S.coins < 10) { say('noMoney'); render(); return; }
+  S.coins -= 10;
+  S.food += 3;
+  addLog('🛒 Купили 3 порции корма за 10💰');
+  render();
+}
+function doBuyMedicine() {
+  if (S.coins < 15) { say('noMoney'); render(); return; }
+  S.coins -= 15;
+  S.medicine += 1;
+  addLog('🛒 Купили лекарство за 15💰');
+  render();
+}
+
+/* ───── RENDER ───── */
+function render() {
+  const app = document.getElementById('app');
+
+  if (!S.started) {
+    app.innerHTML = `
+      <div style="text-align:center;animation:fadeIn .6s ease">
+        <div style="font-size:80px;margin-bottom:8px">😺</div>
+        <h1 style="font-size:28px;font-weight:800;color:#92400e;margin-bottom:6px;">Котик Тыгыдык</h1>
+        <p style="font-size:14px;color:#a16207;margin-bottom:24px;line-height:1.6;">
+          Заведи котика! Корми, пои, чеши, убирай —<br>и готовься к ТЫГЫДЫКУ.
+        </p>
+        <div style="background:rgba(255,255,255,.6);border-radius:16px;padding:16px 20px;margin-bottom:24px;text-align:left;border:1px solid rgba(0,0,0,.06);">
+          <div style="font-size:13px;font-weight:700;color:#b45309;margin-bottom:10px;">Что делать:</div>
+          <div style="font-size:13px;color:#78350f;line-height:2;">
+            🍖 Кормить (нужен корм из магазина)<br>
+            💧 Поить (вода бесплатная)<br>
+            🤗 Гладить и чесать (поднимает настроение)<br>
+            🧹 Чистить лоток<br>
+            ✨ Вычёсывать шерсть<br>
+            💊 Лечить если заболел<br>
+            🛒 Покупать корм и лекарства<br>
+            ⚡ Пережить ТЫГЫДЫК!
+          </div>
+        </div>
+        <button onclick="startGame()" style="border:none;cursor:pointer;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:18px;font-weight:700;padding:16px 48px;border-radius:14px;box-shadow:0 4px 20px rgba(217,119,6,.3);font-family:inherit;">
+          Завести котика! 🐱
+        </button>
+      </div>`;
+    return;
+  }
+
+  if (!S.alive) {
+    app.innerHTML = `
+      <div class="game-over" style="animation:fadeIn .6s ease">
+        <div style="font-size:64px;margin-bottom:12px;">😿</div>
+        <h2>Котик ушёл на радугу...</h2>
+        <p style="color:#78350f;margin-bottom:8px;">Дней прожито: <b>${S.daysSurvived}</b></p>
+        <p style="color:#78350f;margin-bottom:24px;">Мышей поймано: <b>${S.mousesCaught}</b> 🐭</p>
+        <button onclick="restartGame()" style="border:none;cursor:pointer;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:16px;font-weight:700;padding:14px 40px;border-radius:14px;font-family:inherit;">
+          Завести нового котика 🐱
+        </button>
+      </div>`;
+    return;
+  }
+
+  // Status badges
+  let badges = '';
+  if (S.isSick) badges += '<span class="badge sick">🤒 Болеет</span>';
+  if (S.mood < 25) badges += '<span class="badge bored">😐 Скучает</span>';
+  if (S.tygydykActive) badges += '<span class="badge tygydyk-badge">⚡ ТЫГЫДЫК!</span>';
+  if (S.mood > 75 && S.health > 70 && !S.isSick) badges += '<span class="badge happy">😸 Доволен</span>';
+  if (S.hunger < 15) badges += '<span class="badge sick">🍖 Голодный!</span>';
+  if (S.water < 15) badges += '<span class="badge sick">💧 Хочет пить!</span>';
+
+  // Fur particles HTML
+  let furHTML = S.furParticles.map(p =>
+    `<div class="fur" style="left:${p.x}%;top:${p.y}%;animation:floatFur ${2+Math.random()*2}s ease forwards">🧶</div>`
+  ).join('');
+
+  // Cat class
+  let catClass = 'cat-emoji';
+  if (S.tygydykActive) catClass += ' tygydyk';
+  else if (S.mood > 70 && !S.isSick) catClass += ' purr';
+  if (S.isSick) catClass += ' sick';
+
+  // Log HTML
+  let logHTML = S.log.slice(0, 8).map(e =>
+    `<div class="log-entry"><span class="log-time">${e.time}</span>${e.msg}</div>`
+  ).join('');
+
+  app.innerHTML = `
+    <!-- Resources -->
+    <div class="res-bar">
+      <div class="res-item">💰 ${S.coins}</div>
+      <div class="res-item">🥫 Корм: ${S.food}</div>
+      <div class="res-item">💊 ${S.medicine}</div>
+      <div class="res-item">📅 День ${S.daysSurvived}</div>
+    </div>
+
+    <!-- Status badges -->
+    ${badges ? '<div class="status-badges">' + badges + '</div>' : ''}
+
+    <!-- Cat area -->
+    <div class="cat-area">
+      ${furHTML}
+      <div class="bubble">${S.phrase}</div>
+      <div class="${catClass}">${S.catFace}</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">🍖 Сытость</div>
+        <div class="stat-bar"><div class="stat-fill ${statColor(S.hunger)}" style="width:${S.hunger}%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">💧 Вода</div>
+        <div class="stat-bar"><div class="stat-fill ${statColor(S.water)}" style="width:${S.water}%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">😺 Настроение</div>
+        <div class="stat-bar"><div class="stat-fill ${statColor(S.mood)}" style="width:${S.mood}%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">❤️ Здоровье</div>
+        <div class="stat-bar"><div class="stat-fill ${statColor(S.health)}" style="width:${S.health}%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">🧹 Лоток</div>
+        <div class="stat-bar"><div class="stat-fill ${statColor(S.litter)}" style="width:${S.litter}%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">✨ Шерсть</div>
+        <div class="stat-bar"><div class="stat-fill ${statColor(S.fur)}" style="width:${S.fur}%"></div></div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="act-btn" onclick="doFeed()" ${S.food<=0?'disabled':''}>
+        <span class="act-icon">🍖</span>Покормить
+      </button>
+      <button class="act-btn" onclick="doWater()">
+        <span class="act-icon">💧</span>Напоить
+      </button>
+      <button class="act-btn" onclick="doPet()">
+        <span class="act-icon">🤗</span>Погладить
+      </button>
+      <button class="act-btn" onclick="doCleanLitter()">
+        <span class="act-icon">🧹</span>Лоток
+      </button>
+      <button class="act-btn" onclick="doBrush()">
+        <span class="act-icon">✨</span>Вычесать
+      </button>
+      <button class="act-btn heal" onclick="doHeal()" ${!S.isSick&&S.health>70?'disabled':''}>
+        <span class="act-icon">💊</span>Лечить
+      </button>
+      <button class="act-btn shop" onclick="doBuyFood()">
+        <span class="act-icon">🥫</span>Корм 10💰
+      </button>
+      <button class="act-btn shop" onclick="doBuyMedicine()">
+        <span class="act-icon">💊</span>Лек-во 15💰
+      </button>
+      <button class="act-btn" onclick="startTygydyk()" ${S.tygydykActive||S.isSick||S.health<20?'disabled':''}>
+        <span class="act-icon">⚡</span>Тыгыдык!
+      </button>
+    </div>
+
+    <!-- Log -->
+    <div class="log">${logHTML || '<div class="log-entry" style="color:#a8a29e">Пока тихо...</div>'}</div>
+  `;
+}
+
+/* ───── GAME LIFECYCLE ───── */
+let tickInterval;
+
+function startGame() {
+  initState();
+  S.started = true;
+  addLog('🐱 Котик появился!');
+  render();
+  tickInterval = setInterval(gameTick, 2000);
+}
+
+function restartGame() {
+  clearInterval(tickInterval);
+  startGame();
+}
+
+// Initial render (start screen)
+render();
+</script>
+</body>
+</html>
