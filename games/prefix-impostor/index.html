@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Приставка-самозванец</title>
+
+<!-- Include shared header styles -->
+<link rel="stylesheet" href="../../shared/header.css">
+
+<style>
+  /* Override shared header body styles for this game's dark theme */
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    color: #e8e6f0;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 90px 16px 20px; overflow-x: hidden;
+  }
+  /* Style the shared header to match dark theme */
+  .game-header {
+    background: rgba(15, 12, 41, 0.95);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+  .game-title { color: #e8e6f0; }
+  .back-button { background: linear-gradient(135deg, #7c3aed, #c084fc); }
+  .back-button:hover { background: linear-gradient(135deg, #6d28d9, #a855f7); }
+
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  @keyframes slideUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+  @keyframes shake { 0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)} }
+  @keyframes popIn { 0%{transform:scale(.8);opacity:0}50%{transform:scale(1.1)}100%{transform:scale(1);opacity:1} }
+  @keyframes popScore { 0%{transform:scale(1)}50%{transform:scale(1.4)}100%{transform:scale(1)} }
+  @keyframes glow { 0%,100%{box-shadow:0 0 15px rgba(255,200,50,.3)}50%{box-shadow:0 0 30px rgba(255,200,50,.6)} }
+  @keyframes fadeSlide { from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)} }
+
+  .screen { max-width: 520px; width: 100%; display: none; }
+  .screen.active { display: block; }
+  .btn {
+    border: none; cursor: pointer; transition: all .2s ease;
+    -webkit-appearance: none; appearance: none; font-family: inherit;
+  }
+  .btn:active { transform: scale(.97); }
+  .main-btn {
+    background: linear-gradient(135deg, #7c3aed, #c084fc);
+    color: #fff; font-size: 18px; font-weight: 700; padding: 16px 48px;
+    border-radius: 14px; box-shadow: 0 4px 20px rgba(124,58,237,.4);
+    letter-spacing: .5px;
+  }
+  .opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .opt-btn {
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 14px; padding: 16px 12px; color: #e8e6f0;
+    font-size: 18px; font-weight: 700; text-align: center;
+  }
+  .opt-btn .hint { font-size: 13px; font-weight: 400; display: block; margin-top: 2px; opacity: .7; }
+  .opt-btn.correct { background: rgba(34,197,94,.15); border: 2px solid #22c55e; color: #4ade80; animation: glow 1.5s ease infinite; }
+  .opt-btn.wrong { background: rgba(239,68,68,.15); border: 2px solid #ef4444; color: #f87171; }
+  .opt-btn.dimmed { background: rgba(255,255,255,.02); color: #5a5575; opacity: .4; }
+  .opt-btn:disabled { cursor: default; }
+  .card {
+    background: rgba(255,255,255,.04); border-radius: 20px; padding: 28px 24px;
+    text-align: center; margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .expl-box {
+    border-radius: 16px; padding: 18px 20px; margin-bottom: 16px; text-align: center;
+    animation: fadeSlide .4s ease;
+  }
+  .expl-box.ok { background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2); }
+  .expl-box.no { background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.2); }
+  .history-item {
+    display: flex; align-items: center; gap: 12px;
+    border-radius: 12px; padding: 10px 14px; margin-bottom: 8px;
+  }
+  .history-item.ok { background: rgba(34,197,94,.06); border: 1px solid rgba(34,197,94,.15); }
+  .history-item.no { background: rgba(239,68,68,.06); border: 1px solid rgba(239,68,68,.15); }
+</style>
+</head>
+<body>
+<!-- The header will be automatically injected here by header.js -->
+
+<!-- START SCREEN -->
+<div id="startScreen" class="screen active" style="text-align:center; animation: slideUp .6s ease;">
+  <div style="font-size:72px; margin-bottom:8px; animation: float 3s ease-in-out infinite;">🕵️</div>
+  <h1 style="font-size:32px; font-weight:800; margin:0 0 8px;
+    background:linear-gradient(135deg,#ffd700,#ff6b6b,#c084fc);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Приставка-самозванец</h1>
+  <p style="font-size:15px; color:#a8a3c0; margin:0 0 28px; line-height:1.6;">
+    Кто-то перепутал приставки в испанских словах!<br>Найди самозванца и поставь правильную.
+  </p>
+  <div style="background:rgba(255,255,255,.06); border-radius:16px; padding:20px 24px; margin-bottom:28px; text-align:left; border:1px solid rgba(255,255,255,.08);">
+    <div style="font-size:14px; font-weight:600; color:#c084fc; margin-bottom:12px;">Как играть:</div>
+    <div style="font-size:14px; color:#b8b3d0; line-height:1.8;">
+      <span style="color:#ffd700">1.</span> Видишь слово с неправильной приставкой<br>
+      <span style="color:#ffd700">2.</span> Выбираешь правильную из четырёх вариантов<br>
+      <span style="color:#ffd700">3.</span> Узнаёшь значение слова и его частей
+    </div>
+  </div>
+  <button class="btn main-btn" onclick="startGame()">¡Empezar! →</button>
+  <div style="margin-top:12px; font-size:13px; color:#7a7590;">12 раундов</div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="gameScreen" class="screen">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div style="font-size:13px; color:#8a84a8;">Раунд <span id="roundNum" style="color:#e8e6f0;font-weight:700;">1</span> / 12</div>
+    <div style="display:flex; gap:16px; align-items:center;">
+      <div id="streakBadge" style="font-size:13px; color:#ffd700; font-weight:600; display:none;">🔥 <span id="streakNum">0</span></div>
+      <div id="scoreDisplay" style="font-size:20px; font-weight:800; color:#c084fc;">0</div>
+    </div>
+  </div>
+  <div style="height:4px; background:rgba(255,255,255,.08); border-radius:2px; margin-bottom:28px; overflow:hidden;">
+    <div id="progressBar" style="height:100%; width:0%; background:linear-gradient(90deg,#7c3aed,#c084fc); border-radius:2px; transition:width .5s ease;"></div>
+  </div>
+  <div id="wordCard" class="card" style="animation:popIn .4s ease;">
+    <div style="font-size:12px; color:#f87171; font-weight:600; margin-bottom:12px; text-transform:uppercase; letter-spacing:1.5px;">❌ Слово с ошибкой</div>
+    <div style="font-size:34px; font-weight:800; margin-bottom:6px;">
+      <span id="fakePrefix" style="color:#f87171; text-decoration:line-through; text-decoration-thickness:2px;"></span><span id="rootDisplay" style="color:#e8e6f0;"></span>
+    </div>
+    <div style="font-size:13px; color:#7a7590; margin-top:8px;">
+      Корень <span id="rootHint" style="color:#a8a3c0; font-weight:600;"></span> = <span id="rootMeaning"></span>
+    </div>
+  </div>
+  <div style="text-align:center; font-size:15px; color:#b8b3d0; margin-bottom:16px; font-weight:500;">Какая приставка правильная?</div>
+  <div id="optionsGrid" class="opt-grid"></div>
+  <div id="explanationArea" style="display:none;"></div>
+</div>
+
+<!-- RESULTS SCREEN -->
+<div id="resultsScreen" class="screen" style="text-align:center;"></div>
+
+<!-- Include shared header script -->
+<script src="../../shared/header.js"></script>
+
+<script>
+const WORDS=[
+  {word:"submarino",root:"marino",correctPrefix:"sub",meaning:"подводный",rootMeaning:"морской"},
+  {word:"subterráneo",root:"terráneo",correctPrefix:"sub",meaning:"подземный",rootMeaning:"земной"},
+  {word:"subrayar",root:"rayar",correctPrefix:"sub",meaning:"подчёркивать",rootMeaning:"чертить"},
+  {word:"subconsciente",root:"consciente",correctPrefix:"sub",meaning:"подсознательный",rootMeaning:"сознательный"},
+  {word:"subtítulo",root:"título",correctPrefix:"sub",meaning:"субтитры",rootMeaning:"заголовок"},
+  {word:"extraterrestre",root:"terrestre",correctPrefix:"extra",meaning:"инопланетный",rootMeaning:"земной"},
+  {word:"extraordinario",root:"ordinario",correctPrefix:"extra",meaning:"необычайный",rootMeaning:"обычный"},
+  {word:"extraescolar",root:"escolar",correctPrefix:"extra",meaning:"внешкольный",rootMeaning:"школьный"},
+  {word:"superhéroe",root:"héroe",correctPrefix:"super",meaning:"супергерой",rootMeaning:"герой"},
+  {word:"supermercado",root:"mercado",correctPrefix:"super",meaning:"супермаркет",rootMeaning:"рынок"},
+  {word:"supervivencia",root:"vivencia",correctPrefix:"super",meaning:"выживание",rootMeaning:"жизнь"},
+  {word:"sobrevivir",root:"vivir",correctPrefix:"sobre",meaning:"выживать",rootMeaning:"жить"},
+  {word:"sobrenatural",root:"natural",correctPrefix:"sobre",meaning:"сверхъестественный",rootMeaning:"естественный"},
+  {word:"sobrecarga",root:"carga",correctPrefix:"sobre",meaning:"перегрузка",rootMeaning:"нагрузка"},
+  {word:"predecir",root:"decir",correctPrefix:"pre",meaning:"предсказывать",rootMeaning:"говорить"},
+  {word:"prehistoria",root:"historia",correctPrefix:"pre",meaning:"предыстория",rootMeaning:"история"},
+  {word:"prevenir",root:"venir",correctPrefix:"pre",meaning:"предотвращать",rootMeaning:"приходить"},
+  {word:"prever",root:"ver",correctPrefix:"pre",meaning:"предвидеть",rootMeaning:"видеть"},
+  {word:"prejuicio",root:"juicio",correctPrefix:"pre",meaning:"предрассудок",rootMeaning:"суждение"},
+  {word:"deshacer",root:"hacer",correctPrefix:"des",meaning:"разрушать",rootMeaning:"делать"},
+  {word:"desconocido",root:"conocido",correctPrefix:"des",meaning:"неизвестный",rootMeaning:"знакомый"},
+  {word:"desaparecer",root:"aparecer",correctPrefix:"des",meaning:"исчезать",rootMeaning:"появляться"},
+  {word:"desorden",root:"orden",correctPrefix:"des",meaning:"беспорядок",rootMeaning:"порядок"},
+  {word:"descubrir",root:"cubrir",correctPrefix:"des",meaning:"открывать",rootMeaning:"покрывать"},
+  {word:"desconfiar",root:"confiar",correctPrefix:"des",meaning:"не доверять",rootMeaning:"доверять"},
+  {word:"imposible",root:"posible",correctPrefix:"im",meaning:"невозможный",rootMeaning:"возможный"},
+  {word:"increíble",root:"creíble",correctPrefix:"in",meaning:"невероятный",rootMeaning:"правдоподобный"},
+  {word:"invisible",root:"visible",correctPrefix:"in",meaning:"невидимый",rootMeaning:"видимый"},
+  {word:"impaciente",root:"paciente",correctPrefix:"im",meaning:"нетерпеливый",rootMeaning:"терпеливый"},
+  {word:"injusto",root:"justo",correctPrefix:"in",meaning:"несправедливый",rootMeaning:"справедливый"},
+  {word:"inmortal",root:"mortal",correctPrefix:"in",meaning:"бессмертный",rootMeaning:"смертный"},
+  {word:"repetir",root:"petir",correctPrefix:"re",meaning:"повторять",rootMeaning:"просить"},
+  {word:"reconstruir",root:"construir",correctPrefix:"re",meaning:"реконструировать",rootMeaning:"строить"},
+  {word:"rehacer",root:"hacer",correctPrefix:"re",meaning:"переделывать",rootMeaning:"делать"},
+  {word:"regresar",root:"gresar",correctPrefix:"re",meaning:"возвращаться",rootMeaning:"идти"},
+  {word:"releer",root:"leer",correctPrefix:"re",meaning:"перечитывать",rootMeaning:"читать"},
+  {word:"internacional",root:"nacional",correctPrefix:"inter",meaning:"международный",rootMeaning:"национальный"},
+  {word:"intercambio",root:"cambio",correctPrefix:"inter",meaning:"обмен",rootMeaning:"перемена"},
+  {word:"interactuar",root:"actuar",correctPrefix:"inter",meaning:"взаимодействовать",rootMeaning:"действовать"},
+  {word:"contradecir",root:"decir",correctPrefix:"contra",meaning:"противоречить",rootMeaning:"говорить"},
+  {word:"contrabando",root:"bando",correctPrefix:"contra",meaning:"контрабанда",rootMeaning:"закон"},
+  {word:"contraataque",root:"ataque",correctPrefix:"contra",meaning:"контратака",rootMeaning:"атака"},
+  {word:"anteayer",root:"ayer",correctPrefix:"ante",meaning:"позавчера",rootMeaning:"вчера"},
+  {word:"antepasado",root:"pasado",correctPrefix:"ante",meaning:"предок",rootMeaning:"прошлый"},
+  {word:"antebrazo",root:"brazo",correctPrefix:"ante",meaning:"предплечье",rootMeaning:"рука"},
+  {word:"antibiótico",root:"biótico",correctPrefix:"anti",meaning:"антибиотик",rootMeaning:"жизненный"},
+  {word:"antisocial",root:"social",correctPrefix:"anti",meaning:"антисоциальный",rootMeaning:"социальный"},
+  {word:"multinacional",root:"nacional",correctPrefix:"multi",meaning:"многонациональный",rootMeaning:"национальный"},
+  {word:"multicolor",root:"color",correctPrefix:"multi",meaning:"многоцветный",rootMeaning:"цвет"},
+  {word:"bilingüe",root:"lingüe",correctPrefix:"bi",meaning:"двуязычный",rootMeaning:"язык"},
+  {word:"bicicleta",root:"cicleta",correctPrefix:"bi",meaning:"велосипед",rootMeaning:"колесо"},
+  {word:"bilateral",root:"lateral",correctPrefix:"bi",meaning:"двусторонний",rootMeaning:"сторонний"},
+  {word:"uniforme",root:"forme",correctPrefix:"uni",meaning:"униформа",rootMeaning:"форма"},
+  {word:"monólogo",root:"logo",correctPrefix:"mono",meaning:"монолог",rootMeaning:"слово"},
+  {word:"transportar",root:"portar",correctPrefix:"trans",meaning:"перевозить",rootMeaning:"нести"},
+  {word:"transformar",root:"formar",correctPrefix:"trans",meaning:"преобразовывать",rootMeaning:"формировать"},
+  {word:"transparente",root:"parente",correctPrefix:"trans",meaning:"прозрачный",rootMeaning:"являющийся"},
+  {word:"automóvil",root:"móvil",correctPrefix:"auto",meaning:"автомобиль",rootMeaning:"движущийся"},
+  {word:"autoestima",root:"estima",correctPrefix:"auto",meaning:"самооценка",rootMeaning:"оценка"},
+  {word:"semicírculo",root:"círculo",correctPrefix:"semi",meaning:"полукруг",rootMeaning:"круг"},
+  {word:"semifinal",root:"final",correctPrefix:"semi",meaning:"полуфинал",rootMeaning:"финал"},
+  {word:"microscopio",root:"scopio",correctPrefix:"micro",meaning:"микроскоп",rootMeaning:"смотреть"},
+  {word:"microondas",root:"ondas",correctPrefix:"micro",meaning:"микроволновка",rootMeaning:"волны"},
+  {word:"teléfono",root:"fono",correctPrefix:"tele",meaning:"телефон",rootMeaning:"звук"},
+  {word:"televisión",root:"visión",correctPrefix:"tele",meaning:"телевидение",rootMeaning:"видение"},
+  {word:"telescopio",root:"scopio",correctPrefix:"tele",meaning:"телескоп",rootMeaning:"смотреть"},
+  {word:"cooperar",root:"operar",correctPrefix:"co",meaning:"сотрудничать",rootMeaning:"работать"},
+  {word:"convivir",root:"vivir",correctPrefix:"con",meaning:"сосуществовать",rootMeaning:"жить"},
+];
+const ALL_PREFIXES=["sub","extra","super","sobre","pre","des","in","im","re","inter","contra","ante","anti","multi","bi","uni","mono","trans","auto","semi","micro","tele","co","con"];
+const PM={sub:"под, ниже",extra:"вне, сверх",super:"сверх, над",sobre:"над, сверх",pre:"до, перед",des:"отрицание",in:"не, без",im:"не, без",re:"снова",inter:"между",contra:"против",ante:"перед, до",anti:"против",multi:"много",bi:"два",uni:"один",mono:"один",trans:"через",auto:"сам",semi:"полу-",micro:"маленький",tele:"далеко",co:"вместе",con:"вместе"};
+const TOTAL=12;
+const YAY=["🎉 ¡Excelente!","💪 ¡Muy bien!","🔥 ¡Perfecto!","⭐ ¡Genial!","✨ ¡Bravo!","🎯 ¡Increíble!","👏 ¡Fantástico!","🌟 ¡Así se hace!"];
+const NAY=["🤔 ¡Casi!","😅 No pasa nada","💡 ¡Sigue intentando!","🧐 La próxima vez"];
+let questions=[],current=0,score=0,streak=0,bestStreak=0,answered=false,history=[];
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function genQ(w){
+  let wrong=shuffle(ALL_PREFIXES.filter(p=>p!==w.correctPrefix)).slice(0,3);
+  let fake=wrong[0];
+  return{...w,fakePrefix:fake,fakeWord:fake+w.root,options:shuffle([w.correctPrefix,...wrong])};
+}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function startGame(){
+  questions=shuffle(WORDS).slice(0,TOTAL).map(genQ);
+  current=0;score=0;streak=0;bestStreak=0;answered=false;history=[];
+  show('gameScreen');
+  renderQ();
+}
+function renderQ(){
+  const q=questions[current];
+  answered=false;
+  document.getElementById('roundNum').textContent=current+1;
+  document.getElementById('scoreDisplay').textContent=score;
+  document.getElementById('progressBar').style.width=(current/TOTAL*100)+'%';
+  document.getElementById('streakBadge').style.display=streak>=2?'block':'none';
+  document.getElementById('streakNum').textContent=streak;
+  document.getElementById('fakePrefix').textContent=q.fakePrefix;
+  document.getElementById('rootDisplay').textContent=q.root;
+  document.getElementById('rootHint').textContent=q.root;
+  document.getElementById('rootMeaning').textContent=q.rootMeaning;
+  document.getElementById('explanationArea').style.display='none';
+  const card=document.getElementById('wordCard');
+  card.style.animation='none';card.offsetHeight;card.style.animation='popIn .4s ease';
+  const grid=document.getElementById('optionsGrid');
+  grid.innerHTML='';
+  q.options.forEach(p=>{
+    const btn=document.createElement('button');
+    btn.className='btn opt-btn';
+    btn.innerHTML=p+'- <span class="hint">'+PM[p]+'</span>';
+    btn.onclick=()=>handleSelect(p);
+    btn.dataset.prefix=p;
+    grid.appendChild(btn);
+  });
+}
+function handleSelect(prefix){
+  if(answered)return;
+  answered=true;
+  const q=questions[current];
+  const correct=prefix===q.correctPrefix;
+  if(correct){score++;streak++;bestStreak=Math.max(bestStreak,streak);
+    const sd=document.getElementById('scoreDisplay');sd.style.animation='none';sd.offsetHeight;sd.style.animation='popScore .4s ease';
+    sd.textContent=score;
+  } else {
+    streak=0;
+    const card=document.getElementById('wordCard');card.style.animation='none';card.offsetHeight;card.style.animation='shake .5s ease';
+  }
+  document.getElementById('streakBadge').style.display=streak>=2?'block':'none';
+  document.getElementById('streakNum').textContent=streak;
+  document.getElementById('progressBar').style.width=((current+1)/TOTAL*100)+'%';
+  history.push({...q,userAnswer:prefix,correct});
+  document.querySelectorAll('.opt-btn').forEach(btn=>{
+    btn.disabled=true;
+    const p=btn.dataset.prefix;
+    if(p===q.correctPrefix)btn.className='btn opt-btn correct';
+    else if(p===prefix&&!correct)btn.className='btn opt-btn wrong';
+    else btn.className='btn opt-btn dimmed';
+  });
+  setTimeout(()=>{
+    const area=document.getElementById('explanationArea');
+    area.style.display='block';
+    area.innerHTML=`
+      <div class="expl-box ${correct?'ok':'no'}">
+        <div style="font-size:20px;margin-bottom:6px;">${correct?pick(YAY):pick(NAY)}</div>
+        <div style="font-size:24px;font-weight:800;color:#c084fc;margin-bottom:8px;">${q.word}</div>
+        <div style="font-size:14px;color:#b8b3d0;line-height:1.7;">
+          <span style="color:#ffd700;font-weight:600;">${q.correctPrefix}</span> (${PM[q.correctPrefix]})
+          + <span style="font-weight:600;">${q.root}</span> (${q.rootMeaning})
+          = <span style="color:#4ade80;font-weight:600;">${q.meaning}</span>
+        </div>
+      </div>
+      <button class="btn main-btn" style="width:100%;font-size:16px;padding:14px;" onclick="nextQ()">
+        ${current+1>=TOTAL?'Посмотреть результаты':'Дальше →'}
+      </button>`;
+  },400);
+}
+function nextQ(){
+  if(current+1>=TOTAL){showResults();return;}
+  current++;renderQ();
+}
+function showResults(){
+  show('resultsScreen');
+  const emoji=score>=10?'🏆':score>=7?'🌟':score>=4?'💪':'📚';
+  const title=score>=10?'¡Increíble!':score>=7?'¡Muy bien!':score>=4?'¡Buen trabajo!':'¡Sigue practicando!';
+  let histHTML=history.map(h=>`
+    <div class="history-item ${h.correct?'ok':'no'}">
+      <span style="font-size:16px">${h.correct?'✅':'❌'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:700;color:#e8e6f0">${h.word}</div>
+        <div style="font-size:12px;color:#7a7590">${h.meaning}</div>
+      </div>
+      ${!h.correct?`<div style="font-size:12px;color:#f87171;text-align:right;flex-shrink:0">
+        <span style="text-decoration:line-through">${h.userAnswer}-</span> → <span style="color:#4ade80">${h.correctPrefix}-</span>
+      </div>`:''}
+    </div>`).join('');
+  document.getElementById('resultsScreen').innerHTML=`
+    <div style="animation:slideUp .6s ease">
+      <div style="font-size:56px;margin-bottom:8px">${emoji}</div>
+      <h2 style="font-size:30px;font-weight:800;margin:0 0 4px;
+        background:linear-gradient(135deg,#ffd700,#c084fc);
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;">${title}</h2>
+      <div style="display:flex;justify-content:center;gap:32px;margin:24px 0;
+        background:rgba(255,255,255,.04);border-radius:16px;padding:20px;
+        border:1px solid rgba(255,255,255,.08)">
+        <div>
+          <div style="font-size:36px;font-weight:800;color:#c084fc">${score}/${TOTAL}</div>
+          <div style="font-size:12px;color:#7a7590;margin-top:2px">правильных</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,.1)"></div>
+        <div>
+          <div style="font-size:36px;font-weight:800;color:#ffd700">${bestStreak}</div>
+          <div style="font-size:12px;color:#7a7590;margin-top:2px">серия 🔥</div>
+        </div>
+      </div>
+      <div style="text-align:left;margin-bottom:24px">
+        <div style="font-size:14px;font-weight:600;color:#8a84a8;margin-bottom:12px">Разбор ответов:</div>
+        ${histHTML}
+      </div>
+      <button class="btn main-btn" onclick="startGame()">Играть ещё раз 🔄</button>
+    </div>`;
+}
+</script>
+</body>
+</html>
