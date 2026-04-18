@@ -190,6 +190,8 @@
         <button class="btn primary" id="btnStart">▶ Старт</button>
         <button class="btn" id="btnRound">⟳ Новый раунд</button>
         <button class="btn" id="btnTrack">🔀 Трек</button>
+        <button class="btn" id="btnFile">📁 Свой</button>
+        <input type="file" id="fileInput" accept="audio/*" style="display:none">
     </div>
 </div>
 
@@ -681,6 +683,36 @@
     }
     startRound();
     btnStart.textContent = '⏸ Пауза';
+  });
+
+  const btnFile = document.getElementById('btnFile');
+  const fileInput = document.getElementById('fileInput');
+  btnFile.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    btnFile.disabled = true;
+    const prevLabel = btnFile.textContent;
+    btnFile.textContent = '⌛';
+    try {
+      const ctx = await ensureContext();
+      const arr = await file.arrayBuffer();
+      const buf = await ctx.decodeAudioData(arr);
+      state.buffer = buf;
+      state.trackName = file.name;
+      state.peaks = computePeaks(buf, BLOCK_SEC);
+      trackInfoEl.textContent = file.name;
+      startRound();
+      btnStart.textContent = '⏸ Пауза';
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = 'Не удалось прочитать файл: ' + e.message;
+      statusEl.classList.remove('hidden');
+    } finally {
+      btnFile.disabled = false;
+      btnFile.textContent = prevLabel;
+      fileInput.value = '';
+    }
   });
 
   btnTrack.addEventListener('click', async () => {
