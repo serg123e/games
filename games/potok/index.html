@@ -119,9 +119,13 @@
         }
         .btn {
             flex: 1 1 0;
-            padding: 10px 12px;
-            font-size: 14px;
+            min-width: 0;
+            padding: 10px 8px;
+            font-size: 13px;
             font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             color: #e8eaf3;
             background: #2a2f48;
             border: 1px solid #3a4063;
@@ -191,6 +195,7 @@
         <button class="btn" id="btnRound">⟳ Новый раунд</button>
         <button class="btn" id="btnTrack">🔀 Трек</button>
         <button class="btn" id="btnFile">📁 Свой</button>
+        <button class="btn" id="btnRadio">📻 Радио</button>
         <input type="file" id="fileInput" accept="audio/*" style="display:none">
     </div>
 </div>
@@ -205,7 +210,16 @@
   const RAMP_SEC = 0.05;
   const MAX_TAP_PRESSURE_BOOST = 1.5;
 
+  const RADIO_URL = 'https://radio.123automate.it/balkoning';
+  const RADIO_NAME = 'Радио Балконинг';
+  const MAX_DELAY = 8;
+  const LIVE_HISTORY_SEC = 30;
+  const LIVE_FFT = 1024;
+  const LIVE_DELAY_K = 0.6;
+  const LIVE_DELAY_RAMP = 0.08;
+
   const state = {
+    mode: 'buffer',
     ctx: null,
     buffer: null,
     peaks: null,
@@ -226,6 +240,7 @@
     hasRealPressure: false,
     startedAtCtxTime: 0,
     initialOffset: { L: 0, R: 0 },
+    live: null,
   };
 
   const canv = { L: document.getElementById('canvL'), R: document.getElementById('canvR') };
@@ -401,6 +416,8 @@
   function startRound() {
     const ctx = state.ctx;
     stopSources();
+    stopLive();
+    state.mode = 'buffer';
 
     const dur = state.buffer.duration;
     const gap = 0.4 + Math.random() * 1.2;
@@ -473,6 +490,196 @@
     if (tNow <= t0) return from;
     const k = Math.min(1, (tNow - t0) / RAMP_SEC);
     return from + (to - from) * k;
+  }
+
+  // ---------- Live radio mode ----------
+  function createLiveSide(ctx, url, initialDelaySec, pan) {
+    const audio = new Audio();
+    audio.crossOrigin = 'anonymous';
+    audio.preload = 'auto';
+    audio.src = url;
+    audio.loop = false;
+    const src = ctx.createMediaElementSource(audio);
+    const gain = ctx.createGain();
+    gain.gain.value = 0.7;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = LIVE_FFT;
+    analyser.smoothingTimeConstant = 0;
+    const delay = ctx.createDelay(MAX_DELAY);
+    delay.delayTime.value = initialDelaySec;
+    const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    src.connect(gain);
+    gain.connect(analyser);
+    analyser.connect(delay);
+    if (panner) {
+      panner.pan.value = pan;
+      delay.connect(panner);
+      panner.connect(ctx.destination);
+    } else {
+      delay.connect(ctx.destination);
+    }
+    const blockSec = LIVE_FFT / ctx.sampleRate;
+    const histLen = Math.ceil(LIVE_HISTORY_SEC / blockSec);
+    return {
+      audio, src, gain, analyser, delay, panner,
+      tmp: new Float32Array(LIVE_FFT),
+      mins: new Float32Array(histLen),
+      maxs: new Float32Array(histLen),
+      times: new Float64Array(histLen),
+      write: 0,
+      filled: 0,
+      blockSec,
+      histLen,
+      lastSampleTime: 0,
+      targetDelay: initialDelaySec,
+      delayValue: initialDelaySec,
+    };
+  }
+
+  async function startLiveRound() {
+    await ensureContext();
+    const ctx = state.ctx;
+    stopSources();
+    stopLive();
+
+    const gap = 0.4 + Math.random() * 1.2;
+    const sign = Math.random() < 0.5 ? 1 : -1;
+    const delayL = sign > 0 ? 0.2 : 0.2 + gap;
+    const delayR = sign > 0 ? 0.2 + gap : 0.2;
+
+    const L = createLiveSide(ctx, RADIO_URL, delayL, -0.6);
+    const R = createLiveSide(ctx, RADIO_URL, delayR, 0.6);
+    state.live = { L, R };
+    state.mode = 'live';
+    state.trackName = RADIO_NAME;
+    trackInfoEl.textContent = RADIO_NAME;
+
+    try {
+      await Promise.all([L.audio.play(), R.audio.play()]);
+    } catch (e) {
+      statusEl.textContent = 'Не удалось запустить поток: ' + e.message;
+      statusEl.classList.remove('hidden');
+      throw e;
+    }
+
+    state.playing = true;
+    state.lastFrameTime = performance.now();
+    state.initialOffset.L = delayL;
+    state.initialOffset.R = delayR;
+    state.targetRate.L = delayL;
+    state.targetRate.R = delayR;
+    statusEl.classList.add('hidden');
+  }
+
+  function stopLive() {
+    if (!state.live) return;
+    for (const side of ['L', 'R']) {
+      const s = state.live[side];
+      if (!s) continue;
+      try { s.audio.pause(); } catch (e) {}
+      try { s.src.disconnect(); } catch (e) {}
+      try { s.gain.disconnect(); } catch (e) {}
+      try { s.analyser.disconnect(); } catch (e) {}
+      try { s.delay.disconnect(); } catch (e) {}
+      if (s.panner) { try { s.panner.disconnect(); } catch (e) {} }
+      s.audio.src = '';
+    }
+    state.live = null;
+  }
+
+  function sampleLive(side, nowSec) {
+    const s = state.live[side];
+    s.analyser.getFloatTimeDomainData(s.tmp);
+    let mn = 1, mx = -1;
+    for (let i = 0; i < s.tmp.length; i++) {
+      const v = s.tmp[i];
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+    s.mins[s.write] = mn;
+    s.maxs[s.write] = mx;
+    s.times[s.write] = nowSec;
+    s.write = (s.write + 1) % s.histLen;
+    if (s.filled < s.histLen) s.filled++;
+    s.lastSampleTime = nowSec;
+  }
+
+  function applyDelayTarget(side, target) {
+    const ctx = state.ctx;
+    if (!ctx || !state.live) return;
+    const s = state.live[side];
+    if (!s) return;
+    const now = ctx.currentTime;
+    const t = Math.max(0, Math.min(MAX_DELAY - 0.1, target));
+    s.targetDelay = t;
+    const p = s.delay.delayTime;
+    p.cancelScheduledValues(now);
+    p.setValueAtTime(p.value, now);
+    p.linearRampToValueAtTime(t, now + LIVE_DELAY_RAMP);
+  }
+
+  function drawLiveWaveform(side) {
+    const c = canv[side];
+    const ctx2d = c.getContext('2d');
+    const W = c.width, H = c.height;
+    const dpr = c._dpr;
+    ctx2d.clearRect(0, 0, W, H);
+    const s = state.live[side];
+    if (!s || s.filled === 0) return;
+
+    const pxPerSec = H / WINDOW_SEC;
+    const cx = W / 2;
+    const halfW = W * 0.42;
+    const now = performance.now() / 1000;
+    const currentDelay = s.delay.delayTime.value;
+
+    ctx2d.lineWidth = Math.max(1, dpr);
+    ctx2d.strokeStyle = side === 'L' ? 'rgba(120, 180, 255, 0.9)' : 'rgba(255, 150, 120, 0.9)';
+
+    const startIdx = (s.write - s.filled + s.histLen) % s.histLen;
+    for (let k = 0; k < s.filled; k++) {
+      const idx = (startIdx + k) % s.histLen;
+      const age = now - s.times[idx];
+      const relTime = currentDelay - age;
+      const y = H / 2 + relTime * pxPerSec;
+      if (y < -2 || y > H + 2) continue;
+
+      const mn = s.mins[idx];
+      const mx = s.maxs[idx];
+      const amp = Math.max(Math.abs(mn), Math.abs(mx));
+      const w = amp * halfW;
+
+      const dy = y - H / 2;
+      const distFromCenter = Math.abs(dy) / (H / 2);
+      let alpha;
+      if (dy >= 0) alpha = 0.95 - distFromCenter * 0.5;
+      else alpha = 0.55 - distFromCenter * 0.4;
+      if (alpha < 0.05) continue;
+
+      ctx2d.globalAlpha = alpha;
+      ctx2d.beginPath();
+      ctx2d.moveTo(cx - w, Math.round(y));
+      ctx2d.lineTo(cx + w, Math.round(y));
+      ctx2d.stroke();
+    }
+    ctx2d.globalAlpha = 1;
+
+    ctx2d.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx2d.lineWidth = Math.max(1.5, dpr * 1.5);
+    ctx2d.beginPath();
+    ctx2d.moveTo(0, Math.round(H / 2));
+    ctx2d.lineTo(W, Math.round(H / 2));
+    ctx2d.stroke();
+
+    ctx2d.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx2d.font = `${Math.round(11 * dpr)}px sans-serif`;
+    ctx2d.fillText(side, 6 * dpr, 14 * dpr);
+
+    ctx2d.fillStyle = 'rgba(180, 220, 255, 0.85)';
+    ctx2d.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
+    const txt = (currentDelay * 1000).toFixed(0) + ' мс';
+    const tw = ctx2d.measureText(txt).width;
+    ctx2d.fillText(txt, W - tw - 6 * dpr, 14 * dpr);
   }
 
   // ---------- Rendering ----------
@@ -558,7 +765,12 @@
       deltaVal.textContent = '—';
       return;
     }
-    const deltaSec = state.playhead.R - state.playhead.L;
+    let deltaSec;
+    if (state.mode === 'live' && state.live) {
+      deltaSec = state.live.R.delay.delayTime.value - state.live.L.delay.delayTime.value;
+    } else {
+      deltaSec = state.playhead.R - state.playhead.L;
+    }
     const deltaMs = deltaSec * 1000;
     const clamped = Math.max(-2000, Math.min(2000, deltaMs));
     const pct = 50 + (clamped / 2000) * 50;
@@ -577,22 +789,29 @@
 
   function frame(now) {
     requestAnimationFrame(frame);
-    if (!state.playing || !state.buffer) return;
+    if (!state.playing) return;
     const ctx = state.ctx;
     const ctxNow = ctx.currentTime;
     const dt = Math.max(0, (now - state.lastFrameTime) / 1000);
     state.lastFrameTime = now;
 
-    for (const side of ['L', 'R']) {
-      const rate = computeCurrentRate(side, ctxNow);
-      state.currentRate[side] = rate;
-      const dur = state.buffer.duration;
-      state.playhead[side] = (state.playhead[side] + dt * rate) % dur;
-      if (state.playhead[side] < 0) state.playhead[side] += dur;
+    if (state.mode === 'live' && state.live) {
+      const nowSec = now / 1000;
+      sampleLive('L', nowSec);
+      sampleLive('R', nowSec);
+      drawLiveWaveform('L');
+      drawLiveWaveform('R');
+    } else if (state.buffer) {
+      for (const side of ['L', 'R']) {
+        const rate = computeCurrentRate(side, ctxNow);
+        state.currentRate[side] = rate;
+        const dur = state.buffer.duration;
+        state.playhead[side] = (state.playhead[side] + dt * rate) % dur;
+        if (state.playhead[side] < 0) state.playhead[side] += dur;
+      }
+      drawWaveform('L');
+      drawWaveform('R');
     }
-
-    drawWaveform('L');
-    drawWaveform('R');
     updateSyncBar();
   }
   requestAnimationFrame(frame);
@@ -616,28 +835,55 @@
     }
   }
 
+  function liveDelayTargetFromEvent(e, rect, side) {
+    const yRel = (e.clientY - rect.top) / rect.height;
+    const offset = Math.max(-1, Math.min(1, (yRel - 0.5) * 2));
+    let amp = 1;
+    const pr = e.pressure;
+    if (state.hasRealPressure && pr > 0 && pr !== 0.5 && pr !== 1) {
+      amp = Math.max(0.2, Math.min(MAX_TAP_PRESSURE_BOOST, pr * 2));
+    }
+    const current = state.live[side].delay.delayTime.value;
+    return current + LIVE_DELAY_K * offset * amp * 0.02;
+  }
+
   function onPointerDown(e) {
     const side = e.currentTarget.dataset.side;
     e.currentTarget.setPointerCapture(e.pointerId);
     e.preventDefault();
     detectPressure(e);
     const rect = e.currentTarget.getBoundingClientRect();
-    state.pointers.set(e.pointerId, { side, rect });
+    state.pointers.set(e.pointerId, { side, rect, lastApply: 0 });
     if (!state.playing) return;
-    applyRateTarget(side, targetRateFromEvent(e, rect));
+    if (state.mode === 'live' && state.live) {
+      applyDelayTarget(side, liveDelayTargetFromEvent(e, rect, side));
+    } else {
+      applyRateTarget(side, targetRateFromEvent(e, rect));
+    }
   }
 
   function onPointerMove(e) {
     const info = state.pointers.get(e.pointerId);
     if (!info) return;
     detectPressure(e);
-    applyRateTarget(info.side, targetRateFromEvent(e, info.rect));
+    if (state.mode === 'live' && state.live) {
+      const nowMs = performance.now();
+      if (nowMs - info.lastApply >= 20) {
+        info.lastApply = nowMs;
+        applyDelayTarget(info.side, liveDelayTargetFromEvent(e, info.rect, info.side));
+      }
+    } else {
+      applyRateTarget(info.side, targetRateFromEvent(e, info.rect));
+    }
   }
 
   function onPointerUp(e) {
     const info = state.pointers.get(e.pointerId);
     if (!info) return;
     state.pointers.delete(e.pointerId);
+    if (state.mode === 'live') {
+      return;
+    }
     applyRateTarget(info.side, 1);
   }
 
@@ -670,6 +916,7 @@
       }
     } else {
       stopSources();
+      stopLive();
       state.playing = false;
       btnStart.textContent = '▶ Старт';
       statusEl.textContent = 'Пауза';
@@ -678,11 +925,34 @@
   });
 
   btnRound.addEventListener('click', async () => {
+    if (state.mode === 'live') {
+      try {
+        await startLiveRound();
+      } catch (e) {}
+      btnStart.textContent = '⏸ Пауза';
+      return;
+    }
     if (!state.buffer) {
       await prepareTrack(false);
     }
     startRound();
     btnStart.textContent = '⏸ Пауза';
+  });
+
+  const btnRadio = document.getElementById('btnRadio');
+  btnRadio.addEventListener('click', async () => {
+    btnRadio.disabled = true;
+    const prev = btnRadio.textContent;
+    btnRadio.textContent = '⌛';
+    try {
+      await startLiveRound();
+      btnStart.textContent = '⏸ Пауза';
+    } catch (e) {
+      console.error(e);
+    } finally {
+      btnRadio.disabled = false;
+      btnRadio.textContent = prev;
+    }
   });
 
   const btnFile = document.getElementById('btnFile');
@@ -731,6 +1001,7 @@
   // ---------- Cleanup ----------
   function shutdown() {
     stopSources();
+    stopLive();
     state.playing = false;
     if (state.ctx && state.ctx.state !== 'closed') {
       state.ctx.close().catch(() => {});
