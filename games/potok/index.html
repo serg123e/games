@@ -167,6 +167,36 @@
         }
         .hint.top { top: 6px; }
         .hint.bot { bottom: 6px; }
+
+        .mute-btn {
+            position: absolute;
+            bottom: 10px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            line-height: 1;
+            background: rgba(20, 22, 35, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 50%;
+            color: #e8eaf3;
+            cursor: pointer;
+            z-index: 5;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .mute-btn:hover { background: rgba(40, 45, 70, 0.85); }
+        .mute-btn:active { background: rgba(12, 14, 22, 0.95); }
+        .mute-btn.left { left: 10px; }
+        .mute-btn.right { right: 10px; }
+        .mute-btn.muted {
+            background: rgba(120, 30, 30, 0.85);
+            border-color: rgba(255, 120, 120, 0.5);
+        }
     </style>
     <script src="../../shared/header.js"></script>
 </head>
@@ -188,6 +218,8 @@
         <canvas class="stream" id="canvR" data-side="R"></canvas>
         <div class="hint top">↑ быстрее</div>
         <div class="hint bot">↓ медленнее</div>
+        <button class="mute-btn left" id="muteL" data-side="L" aria-label="Заглушить L" type="button">🔊</button>
+        <button class="mute-btn right" id="muteR" data-side="R" aria-label="Заглушить R" type="button">🔊</button>
         <div id="status">Нажмите «Старт», чтобы начать<div class="track" id="trackInfo"></div></div>
     </div>
     <div id="controls">
@@ -241,6 +273,7 @@
     startedAtCtxTime: 0,
     initialOffset: { L: 0, R: 0 },
     live: null,
+    muted: { L: false, R: false },
   };
 
   const canv = { L: document.getElementById('canvL'), R: document.getElementById('canvR') };
@@ -435,7 +468,7 @@
       src.buffer = state.buffer;
       src.loop = true;
       const gain = ctx.createGain();
-      gain.gain.value = 0.7;
+      gain.gain.value = state.muted[side] ? 0 : 0.7;
       const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       if (panner) panner.pan.value = side === 'L' ? -0.6 : 0.6;
 
@@ -493,35 +526,40 @@
   }
 
   // ---------- Live radio mode ----------
-  function createLiveSide(ctx, url, initialDelaySec, pan) {
+  function createLive(ctx, url, delayL, delayR) {
     const audio = new Audio();
     audio.crossOrigin = 'anonymous';
     audio.preload = 'auto';
     audio.src = url;
     audio.loop = false;
     const src = ctx.createMediaElementSource(audio);
-    const gain = ctx.createGain();
-    gain.gain.value = 0.7;
     const analyser = ctx.createAnalyser();
     analyser.fftSize = LIVE_FFT;
     analyser.smoothingTimeConstant = 0;
-    const delay = ctx.createDelay(MAX_DELAY);
-    delay.delayTime.value = initialDelaySec;
-    const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    src.connect(gain);
-    gain.connect(analyser);
-    analyser.connect(delay);
-    if (panner) {
-      panner.pan.value = pan;
-      delay.connect(panner);
-      panner.connect(ctx.destination);
-    } else {
-      delay.connect(ctx.destination);
-    }
+    src.connect(analyser);
+
+    const makeSide = (initialDelay, pan, side) => {
+      const delay = ctx.createDelay(MAX_DELAY);
+      delay.delayTime.value = initialDelay;
+      const gain = ctx.createGain();
+      gain.gain.value = state.muted[side] ? 0 : 0.7;
+      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      analyser.connect(delay);
+      delay.connect(gain);
+      if (panner) {
+        panner.pan.value = pan;
+        gain.connect(panner);
+        panner.connect(ctx.destination);
+      } else {
+        gain.connect(ctx.destination);
+      }
+      return { delay, gain, panner, targetDelay: initialDelay, delayValue: initialDelay };
+    };
+
     const blockSec = LIVE_FFT / ctx.sampleRate;
     const histLen = Math.ceil(LIVE_HISTORY_SEC / blockSec);
     return {
-      audio, src, gain, analyser, delay, panner,
+      audio, src, analyser,
       tmp: new Float32Array(LIVE_FFT),
       mins: new Float32Array(histLen),
       maxs: new Float32Array(histLen),
@@ -531,8 +569,8 @@
       blockSec,
       histLen,
       lastSampleTime: 0,
-      targetDelay: initialDelaySec,
-      delayValue: initialDelaySec,
+      L: makeSide(delayL, -0.6, 'L'),
+      R: makeSide(delayR, 0.6, 'R'),
     };
   }
 
@@ -547,15 +585,14 @@
     const delayL = sign > 0 ? 0.2 : 0.2 + gap;
     const delayR = sign > 0 ? 0.2 + gap : 0.2;
 
-    const L = createLiveSide(ctx, RADIO_URL, delayL, -0.6);
-    const R = createLiveSide(ctx, RADIO_URL, delayR, 0.6);
-    state.live = { L, R };
+    const live = createLive(ctx, RADIO_URL, delayL, delayR);
+    state.live = live;
     state.mode = 'live';
     state.trackName = RADIO_NAME;
     trackInfoEl.textContent = RADIO_NAME;
 
     try {
-      await Promise.all([L.audio.play(), R.audio.play()]);
+      await live.audio.play();
     } catch (e) {
       statusEl.textContent = 'Не удалось запустить поток: ' + e.message;
       statusEl.classList.remove('hidden');
@@ -573,35 +610,36 @@
 
   function stopLive() {
     if (!state.live) return;
+    const live = state.live;
+    try { live.audio.pause(); } catch (e) {}
+    try { live.src.disconnect(); } catch (e) {}
+    try { live.analyser.disconnect(); } catch (e) {}
     for (const side of ['L', 'R']) {
-      const s = state.live[side];
+      const s = live[side];
       if (!s) continue;
-      try { s.audio.pause(); } catch (e) {}
-      try { s.src.disconnect(); } catch (e) {}
-      try { s.gain.disconnect(); } catch (e) {}
-      try { s.analyser.disconnect(); } catch (e) {}
       try { s.delay.disconnect(); } catch (e) {}
+      try { s.gain.disconnect(); } catch (e) {}
       if (s.panner) { try { s.panner.disconnect(); } catch (e) {} }
-      s.audio.src = '';
     }
+    live.audio.src = '';
     state.live = null;
   }
 
-  function sampleLive(side, nowSec) {
-    const s = state.live[side];
-    s.analyser.getFloatTimeDomainData(s.tmp);
+  function sampleLive(nowSec) {
+    const live = state.live;
+    live.analyser.getFloatTimeDomainData(live.tmp);
     let mn = 1, mx = -1;
-    for (let i = 0; i < s.tmp.length; i++) {
-      const v = s.tmp[i];
+    for (let i = 0; i < live.tmp.length; i++) {
+      const v = live.tmp[i];
       if (v < mn) mn = v;
       if (v > mx) mx = v;
     }
-    s.mins[s.write] = mn;
-    s.maxs[s.write] = mx;
-    s.times[s.write] = nowSec;
-    s.write = (s.write + 1) % s.histLen;
-    if (s.filled < s.histLen) s.filled++;
-    s.lastSampleTime = nowSec;
+    live.mins[live.write] = mn;
+    live.maxs[live.write] = mx;
+    live.times[live.write] = nowSec;
+    live.write = (live.write + 1) % live.histLen;
+    if (live.filled < live.histLen) live.filled++;
+    live.lastSampleTime = nowSec;
   }
 
   function applyDelayTarget(side, target) {
@@ -624,28 +662,30 @@
     const W = c.width, H = c.height;
     const dpr = c._dpr;
     ctx2d.clearRect(0, 0, W, H);
-    const s = state.live[side];
-    if (!s || s.filled === 0) return;
+    const live = state.live;
+    if (!live || live.filled === 0) return;
+    const sideData = live[side];
+    if (!sideData) return;
 
     const pxPerSec = H / WINDOW_SEC;
     const cx = W / 2;
     const halfW = W * 0.42;
     const now = performance.now() / 1000;
-    const currentDelay = s.delay.delayTime.value;
+    const currentDelay = sideData.delay.delayTime.value;
 
     ctx2d.lineWidth = Math.max(1, dpr);
     ctx2d.strokeStyle = side === 'L' ? 'rgba(120, 180, 255, 0.9)' : 'rgba(255, 150, 120, 0.9)';
 
-    const startIdx = (s.write - s.filled + s.histLen) % s.histLen;
-    for (let k = 0; k < s.filled; k++) {
-      const idx = (startIdx + k) % s.histLen;
-      const age = now - s.times[idx];
+    const startIdx = (live.write - live.filled + live.histLen) % live.histLen;
+    for (let k = 0; k < live.filled; k++) {
+      const idx = (startIdx + k) % live.histLen;
+      const age = now - live.times[idx];
       const relTime = currentDelay - age;
       const y = H / 2 + relTime * pxPerSec;
       if (y < -2 || y > H + 2) continue;
 
-      const mn = s.mins[idx];
-      const mx = s.maxs[idx];
+      const mn = live.mins[idx];
+      const mx = live.maxs[idx];
       const amp = Math.max(Math.abs(mn), Math.abs(mx));
       const w = amp * halfW;
 
@@ -797,8 +837,7 @@
 
     if (state.mode === 'live' && state.live) {
       const nowSec = now / 1000;
-      sampleLive('L', nowSec);
-      sampleLive('R', nowSec);
+      sampleLive(nowSec);
       drawLiveWaveform('L');
       drawLiveWaveform('R');
     } else if (state.buffer) {
@@ -895,6 +934,32 @@
     c.addEventListener('pointercancel', onPointerUp);
     c.addEventListener('pointerleave', (e) => {
       if (state.pointers.has(e.pointerId)) onPointerUp(e);
+    });
+  }
+
+  // ---------- Mute ----------
+  const muteBtns = { L: document.getElementById('muteL'), R: document.getElementById('muteR') };
+
+  function applyMute(side) {
+    const m = state.muted[side];
+    const g = m ? 0 : 0.7;
+    if (state.gains[side]) state.gains[side].gain.value = g;
+    if (state.live && state.live[side] && state.live[side].gain) {
+      state.live[side].gain.gain.value = g;
+    }
+    const btn = muteBtns[side];
+    btn.textContent = m ? '🔇' : '🔊';
+    btn.classList.toggle('muted', m);
+    btn.setAttribute('aria-pressed', m ? 'true' : 'false');
+  }
+
+  for (const side of ['L', 'R']) {
+    const btn = muteBtns[side];
+    btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.muted[side] = !state.muted[side];
+      applyMute(side);
     });
   }
 
