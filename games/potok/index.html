@@ -537,6 +537,13 @@
     analyser.fftSize = LIVE_FFT;
     analyser.smoothingTimeConstant = 0;
     src.connect(analyser);
+    // Silent sink: guarantees the engine keeps pulling data through the
+    // analyser even if the downstream delay branches get GC'd or quirked
+    // out by the browser.
+    const analyserSink = ctx.createGain();
+    analyserSink.gain.value = 0;
+    analyser.connect(analyserSink);
+    analyserSink.connect(ctx.destination);
 
     const makeSide = (initialDelay, pan, side) => {
       const delay = ctx.createDelay(MAX_DELAY);
@@ -544,7 +551,7 @@
       const gain = ctx.createGain();
       gain.gain.value = state.muted[side] ? 0 : 0.7;
       const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-      analyser.connect(delay);
+      src.connect(delay);
       delay.connect(gain);
       if (panner) {
         panner.pan.value = pan;
@@ -559,7 +566,7 @@
     const blockSec = LIVE_FFT / ctx.sampleRate;
     const histLen = Math.ceil(LIVE_HISTORY_SEC / blockSec);
     return {
-      audio, src, analyser,
+      audio, src, analyser, analyserSink,
       tmp: new Float32Array(LIVE_FFT),
       mins: new Float32Array(histLen),
       maxs: new Float32Array(histLen),
@@ -614,6 +621,7 @@
     try { live.audio.pause(); } catch (e) {}
     try { live.src.disconnect(); } catch (e) {}
     try { live.analyser.disconnect(); } catch (e) {}
+    if (live.analyserSink) { try { live.analyserSink.disconnect(); } catch (e) {} }
     for (const side of ['L', 'R']) {
       const s = live[side];
       if (!s) continue;
