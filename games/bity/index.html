@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Биты</title>
+    <link rel="stylesheet" href="../../shared/header.css">
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: #0a0b12;
+            color: #e8eaf3;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            padding-top: 70px;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: radial-gradient(ellipse at 50% 30%, #1a1d2e 0%, #08090f 70%);
+        }
+        .game-header { background: rgba(12, 14, 24, 0.9); }
+        .game-title { color: #e8eaf3; }
+        .back-button { background: #5060c0; }
+        .back-button:hover { background: #4050a8; }
+
+        #app {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #topBar {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.03);
+            font-size: 13px;
+        }
+        #rateBig {
+            font-size: 22px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: #e8eaf3;
+            letter-spacing: 0.5px;
+            min-width: 80px;
+            transition: color 0.15s;
+        }
+        #rateBig.fast { color: #9cff9c; }
+        #rateBig.slow { color: #ffc070; }
+        #bpmVal {
+            color: #9ba0b8;
+            font-variant-numeric: tabular-nums;
+        }
+        #bpmVal .num { color: #e8eaf3; font-weight: 600; }
+        #trackInfo {
+            flex: 1 1 auto;
+            text-align: right;
+            color: #6a6f8a;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #playfield {
+            flex: 1 1 auto;
+            position: relative;
+            background: #000;
+            min-height: 0;
+            display: flex;
+        }
+        #canv {
+            flex: 1 1 100%;
+            min-width: 0;
+            height: 100%;
+            display: block;
+            touch-action: none;
+            background: #0b0d16;
+        }
+
+        .hint {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: rgba(255,255,255,0.35);
+            pointer-events: none;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+        .hint.top { top: 8px; }
+        .hint.bot { bottom: 8px; }
+        .hint.mid {
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+            color: rgba(255,255,255,0.15);
+        }
+
+        /* Touch zone flash */
+        .zone {
+            position: absolute;
+            left: 0; right: 0;
+            height: 50%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.18s;
+        }
+        .zone.top {
+            top: 0;
+            background: linear-gradient(to bottom, rgba(120, 255, 160, 0.18), rgba(120, 255, 160, 0));
+        }
+        .zone.bot {
+            bottom: 0;
+            background: linear-gradient(to top, rgba(255, 180, 120, 0.18), rgba(255, 180, 120, 0));
+        }
+        .zone.active { opacity: 1; }
+
+        #status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #9ba0b8;
+            font-size: 15px;
+            text-align: center;
+            pointer-events: none;
+            padding: 0 20px;
+        }
+        #status.hidden { display: none; }
+
+        #genPanel {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px 12px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+        #genPanel.hidden { display: none; }
+        .gen-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+        }
+        .gen-row label {
+            flex: 0 0 76px;
+            color: #9ba0b8;
+            letter-spacing: 0.3px;
+        }
+        .gen-row input[type=range] {
+            flex: 1 1 auto;
+            min-width: 0;
+            accent-color: #6070d0;
+        }
+        .gen-row .gen-val {
+            flex: 0 0 64px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: #e8eaf3;
+            font-weight: 600;
+        }
+        .gen-presets {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .gen-presets .btn {
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 8px 4px;
+            font-size: 12px;
+            background: #242940;
+        }
+        .gen-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .gen-actions .btn { flex: 1 1 0; }
+
+        #controls {
+            flex: 0 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .btn {
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 10px 8px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #e8eaf3;
+            background: #2a2f48;
+            border: 1px solid #3a4063;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            font-family: inherit;
+        }
+        .btn:hover { background: #343a58; }
+        .btn:active { background: #1f2438; transform: scale(0.97); }
+        .btn.primary { background: #5060c0; border-color: #6070d0; }
+        .btn.primary:hover { background: #5a6ad0; }
+        .btn.accent { background: #4a6080; border-color: #5a7090; }
+    </style>
+    <script src="../../shared/header.js"></script>
+</head>
+<body>
+<div id="app">
+    <div id="topBar">
+        <span id="rateBig">1.00×</span>
+        <span id="bpmVal"><span class="num" id="bpmNum">—</span> BPM</span>
+        <span id="trackInfo">настрой и жми «Биты»</span>
+    </div>
+    <div id="playfield">
+        <canvas id="canv"></canvas>
+        <div class="zone top" id="zoneTop"></div>
+        <div class="zone bot" id="zoneBot"></div>
+        <div class="hint top">↑ быстрее</div>
+        <div class="hint mid">— без изменений —</div>
+        <div class="hint bot">↓ медленнее</div>
+        <div id="status">Нажми «▶ Старт» или «🎲 Биты»</div>
+    </div>
+    <div id="genPanel" class="hidden">
+        <div class="gen-row">
+            <label>Темп</label>
+            <input type="range" id="genTempo" min="0.5" max="6" step="0.1" value="3">
+            <span class="gen-val" id="genTempoVal">3.0 Гц</span>
+        </div>
+        <div class="gen-row">
+            <label>Плотность</label>
+            <input type="range" id="genDensity" min="2" max="24" step="1" value="6">
+            <span class="gen-val" id="genDensityVal">6</span>
+        </div>
+        <div class="gen-row">
+            <label>Тон</label>
+            <input type="range" id="genPitch" min="40" max="260" step="1" value="110">
+            <span class="gen-val" id="genPitchVal">110 Гц</span>
+        </div>
+        <div class="gen-row">
+            <label>Яркость</label>
+            <input type="range" id="genBright" min="0.3" max="2.5" step="0.05" value="1">
+            <span class="gen-val" id="genBrightVal">1.00×</span>
+        </div>
+        <div class="gen-row">
+            <label>Длина хит.</label>
+            <input type="range" id="genDecay" min="0.4" max="2.5" step="0.05" value="1">
+            <span class="gen-val" id="genDecayVal">1.00×</span>
+        </div>
+        <div class="gen-row">
+            <label>Гул</label>
+            <input type="range" id="genDrone" min="0" max="0.5" step="0.01" value="0.18">
+            <span class="gen-val" id="genDroneVal">0.18</span>
+        </div>
+        <div class="gen-presets">
+            <button class="btn" data-preset="ambient" type="button">🌊 Эмбиент</button>
+            <button class="btn" data-preset="techno" type="button">🔥 Техно</button>
+            <button class="btn" data-preset="glitch" type="button">⚡ Глитч</button>
+            <button class="btn" data-preset="drone" type="button">🧊 Дрон</button>
+            <button class="btn" data-preset="random" type="button">🎲 Случайно</button>
+        </div>
+        <div class="gen-actions">
+            <button class="btn" id="btnGenClose" type="button">✕ Скрыть</button>
+            <button class="btn primary" id="btnGenGo" type="button">▶ Сгенерировать</button>
+        </div>
+    </div>
+    <div id="controls">
+        <button class="btn primary" id="btnStart" type="button">▶ Старт</button>
+        <button class="btn" id="btnBits" type="button">🎲 Биты</button>
+        <button class="btn accent" id="btnResetRate" type="button">↺ 1×</button>
+        <button class="btn" id="btnGenToggle" type="button">🎛 Настр.</button>
+    </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const WINDOW_SEC = 6;
+  const BLOCK_SEC = 0.01;
+  const RAMP_SEC = 0.06;
+  const MIN_RATE = 0.1;
+  const MAX_RATE = 4;
+  const MAX_TAP_FACTOR = 0.35;
+
+  const state = {
+    ctx: null,
+    buffer: null,
+    peaks: null,
+    playing: false,
+    source: null,
+    gain: null,
+    playhead: 0,
+    currentRate: 1,
+    targetRate: 1,
+    rampStart: 0,
+    rampFrom: 1,
+    lastFrameTime: 0,
+    tap: { active: false, pointerId: null, pinnedRate: 1 },
+    synth: {
+      tempoHz: 3,
+      density: 6,
+      basePitch: 110,
+      brightness: 1,
+      decayScale: 1,
+      drone: 0.18,
+      durationSec: 15,
+    },
+  };
+
+  const canv = document.getElementById('canv');
+  const btnStart = document.getElementById('btnStart');
+  const btnBits = document.getElementById('btnBits');
+  const btnResetRate = document.getElementById('btnResetRate');
+  const btnGenToggle = document.getElementById('btnGenToggle');
+  const btnGenGo = document.getElementById('btnGenGo');
+  const btnGenClose = document.getElementById('btnGenClose');
+  const genPanel = document.getElementById('genPanel');
+  const statusEl = document.getElementById('status');
+  const trackInfoEl = document.getElementById('trackInfo');
+  const rateBigEl = document.getElementById('rateBig');
+  const bpmNumEl = document.getElementById('bpmNum');
+  const zoneTop = document.getElementById('zoneTop');
+  const zoneBot = document.getElementById('zoneBot');
+
+  // ---------- Canvas sizing ----------
+  function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = canv.getBoundingClientRect();
+    canv.width = Math.max(1, Math.round(rect.width * dpr));
+    canv.height = Math.max(1, Math.round(rect.height * dpr));
+    canv._dpr = dpr;
+    canv._cssW = rect.width;
+    canv._cssH = rect.height;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', resizeCanvas);
+  }
+
+  // ---------- Synth ----------
+  function getSynthParams() {
+    return Object.assign({}, state.synth);
+  }
+
+  function generateSyntheticBuffer(ctx, params) {
+    const p = params || {};
+    const durationSec = p.durationSec != null ? p.durationSec : 15;
+    const tempoHz = p.tempoHz != null ? p.tempoHz : 3;
+    const density = p.density != null ? p.density : 6;
+    const basePitch = p.basePitch != null ? p.basePitch : 110;
+    const brightness = p.brightness != null ? p.brightness : 1;
+    const decayScale = p.decayScale != null ? p.decayScale : 1;
+    const drone = p.drone != null ? p.drone : 0.18;
+
+    const sr = ctx.sampleRate;
+    const len = Math.floor(durationSec * sr);
+    const buf = ctx.createBuffer(1, len, sr);
+    const data = buf.getChannelData(0);
+
+    const seeds = [];
+    for (let i = 0; i < density; i++) {
+      seeds.push({
+        t: Math.random() * durationSec,
+        freq: (180 + Math.random() * 500) * brightness,
+        decay: (0.25 + Math.random() * 0.55) * decayScale,
+        amp: 0.25 + Math.random() * 0.4,
+      });
+    }
+
+    for (let i = 0; i < len; i++) {
+      const t = i / sr;
+      const beat = 0.35 + 0.5 * Math.max(0, Math.sin(t * 2 * Math.PI * tempoHz));
+      let v = Math.sin(2 * Math.PI * basePitch * t) * drone * beat;
+      v += Math.sin(2 * Math.PI * basePitch * 1.5 * t) * (drone * 0.44) * beat;
+      for (const s of seeds) {
+        const dt = t - s.t;
+        if (dt < 0 || dt > s.decay * 2.5) continue;
+        const env = Math.exp(-dt / s.decay);
+        v += Math.sin(2 * Math.PI * s.freq * dt) * s.amp * env;
+      }
+      data[i] = Math.max(-0.95, Math.min(0.95, v));
+    }
+    return buf;
+  }
+
+  function computePeaks(buffer, blockSec) {
+    const sr = buffer.sampleRate;
+    const blockSize = Math.max(1, Math.round(sr * blockSec));
+    const length = buffer.length;
+    const blocks = Math.ceil(length / blockSize);
+    const mins = new Float32Array(blocks);
+    const maxs = new Float32Array(blocks);
+    const data = buffer.getChannelData(0);
+
+    for (let b = 0; b < blocks; b++) {
+      const start = b * blockSize;
+      const end = Math.min(start + blockSize, length);
+      let mn = 1.0, mx = -1.0;
+      for (let i = start; i < end; i++) {
+        const s = data[i];
+        if (s < mn) mn = s;
+        if (s > mx) mx = s;
+      }
+      mins[b] = mn;
+      maxs[b] = mx;
+    }
+    return { mins, maxs, blockSec, duration: buffer.duration };
+  }
+
+  // ---------- Audio engine ----------
+  async function ensureContext() {
+    if (!state.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      state.ctx = new AC({ latencyHint: 'interactive' });
+    }
+    if (state.ctx.state === 'suspended') {
+      await state.ctx.resume();
+    }
+    return state.ctx;
+  }
+
+  function stopSource() {
+    if (state.source) {
+      try { state.source.stop(); } catch (e) {}
+      try { state.source.disconnect(); } catch (e) {}
+    }
+    if (state.gain) { try { state.gain.disconnect(); } catch (e) {} }
+    state.source = null;
+    state.gain = null;
+  }
+
+  function startPlayback() {
+    const ctx = state.ctx;
+    if (!ctx || !state.buffer) return;
+    stopSource();
+    const src = ctx.createBufferSource();
+    src.buffer = state.buffer;
+    src.loop = true;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.7;
+    src.connect(gain);
+    gain.connect(ctx.destination);
+
+    const startAt = ctx.currentTime + 0.05;
+    src.start(startAt, state.playhead % state.buffer.duration);
+    src.playbackRate.setValueAtTime(state.currentRate, startAt);
+
+    state.source = src;
+    state.gain = gain;
+    state.targetRate = state.currentRate;
+    state.rampFrom = state.currentRate;
+    state.rampStart = startAt;
+    state.playing = true;
+    state.lastFrameTime = performance.now();
+    statusEl.classList.add('hidden');
+    btnStart.textContent = '⏸ Пауза';
+  }
+
+  function pausePlayback() {
+    stopSource();
+    state.playing = false;
+    btnStart.textContent = '▶ Старт';
+    statusEl.textContent = 'Пауза';
+    statusEl.classList.remove('hidden');
+  }
+
+  function applyRateTarget(target) {
+    const ctx = state.ctx;
+    if (!ctx || !state.source) {
+      state.currentRate = target;
+      state.targetRate = target;
+      updateRateUI();
+      return;
+    }
+    const now = ctx.currentTime;
+    const curr = computeCurrentRate(now);
+    state.rampFrom = curr;
+    state.rampStart = now;
+    state.currentRate = curr;
+    state.targetRate = target;
+    const p = state.source.playbackRate;
+    p.cancelScheduledValues(now);
+    p.setValueAtTime(curr, now);
+    p.linearRampToValueAtTime(target, now + RAMP_SEC);
+  }
+
+  function computeCurrentRate(tNow) {
+    const t0 = state.rampStart;
+    const from = state.rampFrom;
+    const to = state.targetRate;
+    if (tNow <= t0) return from;
+    const k = Math.min(1, (tNow - t0) / RAMP_SEC);
+    return from + (to - from) * k;
+  }
+
+  function clampRate(r) {
+    return Math.max(MIN_RATE, Math.min(MAX_RATE, r));
+  }
+
+  // ---------- Rendering ----------
+  function updateRateUI() {
+    const r = state.currentRate;
+    rateBigEl.textContent = r.toFixed(2) + '×';
+    rateBigEl.classList.toggle('fast', r > 1.02);
+    rateBigEl.classList.toggle('slow', r < 0.98);
+    const bpm = state.synth.tempoHz * 60 * r;
+    bpmNumEl.textContent = Math.round(bpm);
+  }
+
+  function drawWaveform() {
+    const ctx2d = canv.getContext('2d');
+    const W = canv.width, H = canv.height;
+    const dpr = canv._dpr || 1;
+    ctx2d.clearRect(0, 0, W, H);
+
+    const peaks = state.peaks;
+    if (!peaks) return;
+    const blockSec = peaks.blockSec;
+    const nBlocks = peaks.mins.length;
+    const duration = peaks.duration;
+
+    const pxPerSec = H / WINDOW_SEC;
+    const cx = W / 2;
+    const halfW = W * 0.44;
+    const ph = state.playhead;
+
+    const rate = state.currentRate;
+    const accent = rate > 1 ? 'rgba(140, 230, 180, 0.9)' : rate < 1 ? 'rgba(240, 180, 130, 0.9)' : 'rgba(160, 190, 255, 0.9)';
+
+    ctx2d.lineWidth = Math.max(1, dpr);
+    ctx2d.strokeStyle = accent;
+
+    const pxPerBlock = pxPerSec * blockSec;
+    const step = Math.max(1, Math.round(1 / pxPerBlock));
+
+    for (let dy = -Math.ceil(H / 2); dy <= Math.ceil(H / 2); dy += step) {
+      const t = ph + (dy / pxPerSec);
+      let tmod = t % duration;
+      if (tmod < 0) tmod += duration;
+      const idx = Math.floor(tmod / blockSec);
+      if (idx < 0 || idx >= nBlocks) continue;
+
+      const mn = peaks.mins[idx];
+      const mx = peaks.maxs[idx];
+      const amp = Math.max(Math.abs(mn), Math.abs(mx));
+      const w = amp * halfW;
+
+      const y = Math.round(H / 2 + dy);
+      const distFromCenter = Math.abs(dy) / (H / 2);
+      let alpha;
+      if (dy >= 0) alpha = 0.95 - distFromCenter * 0.45;
+      else alpha = 0.6 - distFromCenter * 0.4;
+      if (alpha < 0.05) continue;
+
+      ctx2d.globalAlpha = alpha;
+      ctx2d.beginPath();
+      ctx2d.moveTo(cx - w, y);
+      ctx2d.lineTo(cx + w, y);
+      ctx2d.stroke();
+    }
+    ctx2d.globalAlpha = 1;
+
+    ctx2d.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx2d.lineWidth = Math.max(1.5, dpr * 1.5);
+    ctx2d.beginPath();
+    ctx2d.moveTo(0, Math.round(H / 2));
+    ctx2d.lineTo(W, Math.round(H / 2));
+    ctx2d.stroke();
+
+    // Playback-rate sidebar marker at right edge
+    ctx2d.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx2d.fillRect(W - 4 * dpr, 0, 4 * dpr, H);
+    const normalized = Math.log(rate) / Math.log(MAX_RATE);
+    const markerY = H / 2 - normalized * (H / 2 - 6 * dpr);
+    ctx2d.fillStyle = accent;
+    ctx2d.fillRect(W - 6 * dpr, markerY - 2 * dpr, 6 * dpr, 4 * dpr);
+  }
+
+  // ---------- Frame loop ----------
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const ctx = state.ctx;
+    const dt = Math.max(0, (now - state.lastFrameTime) / 1000);
+    state.lastFrameTime = now;
+
+    if (state.playing && ctx && state.buffer) {
+      const ctxNow = ctx.currentTime;
+      state.currentRate = computeCurrentRate(ctxNow);
+      const dur = state.buffer.duration;
+      state.playhead = (state.playhead + dt * state.currentRate) % dur;
+      if (state.playhead < 0) state.playhead += dur;
+    }
+    drawWaveform();
+    updateRateUI();
+  }
+  requestAnimationFrame(frame);
+
+  // ---------- Touch / pointer ----------
+  function yRelFromEvent(e, rect) {
+    return Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+  }
+
+  function tapFactorFromY(yRel) {
+    const offset = (0.5 - yRel) * 2; // top=+1, bot=-1
+    return 1 + offset * MAX_TAP_FACTOR;
+  }
+
+  function applyTapRate(yRel) {
+    const factor = tapFactorFromY(yRel);
+    const target = clampRate(state.tap.pinnedRate * factor);
+    applyRateTarget(target);
+    if (yRel < 0.5) {
+      zoneTop.classList.add('active');
+      zoneBot.classList.remove('active');
+    } else if (yRel > 0.5) {
+      zoneBot.classList.add('active');
+      zoneTop.classList.remove('active');
+    } else {
+      zoneTop.classList.remove('active');
+      zoneBot.classList.remove('active');
+    }
+  }
+
+  function onPointerDown(e) {
+    if (!state.playing) return;
+    canv.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    const rect = canv.getBoundingClientRect();
+    state.tap.active = true;
+    state.tap.pointerId = e.pointerId;
+    state.tap.pinnedRate = state.currentRate;
+    state.tap.rect = rect;
+    applyTapRate(yRelFromEvent(e, rect));
+  }
+
+  function onPointerMove(e) {
+    if (!state.tap.active || state.tap.pointerId !== e.pointerId) return;
+    applyTapRate(yRelFromEvent(e, state.tap.rect));
+  }
+
+  function onPointerUp(e) {
+    if (state.tap.pointerId !== e.pointerId) return;
+    state.tap.active = false;
+    state.tap.pointerId = null;
+    zoneTop.classList.remove('active');
+    zoneBot.classList.remove('active');
+    // Rate persists — no reset. Update pinned reference for next tap.
+    state.tap.pinnedRate = state.targetRate;
+  }
+
+  canv.addEventListener('pointerdown', onPointerDown);
+  canv.addEventListener('pointermove', onPointerMove);
+  canv.addEventListener('pointerup', onPointerUp);
+  canv.addEventListener('pointercancel', onPointerUp);
+  canv.addEventListener('pointerleave', (e) => {
+    if (state.tap.active && state.tap.pointerId === e.pointerId) onPointerUp(e);
+  });
+
+  // Double-tap to reset rate
+  let lastTapTime = 0;
+  canv.addEventListener('pointerup', (e) => {
+    const now = performance.now();
+    if (now - lastTapTime < 280) {
+      resetRate();
+      lastTapTime = 0;
+    } else {
+      lastTapTime = now;
+    }
+  });
+
+  // ---------- Rate helpers ----------
+  function resetRate() {
+    state.tap.pinnedRate = 1;
+    applyRateTarget(1);
+  }
+
+  btnResetRate.addEventListener('click', () => resetRate());
+
+  // ---------- Generator UI ----------
+  const genSliders = {
+    tempoHz:    { el: document.getElementById('genTempo'),    val: document.getElementById('genTempoVal'),    fmt: (v) => v.toFixed(1) + ' Гц' },
+    density:    { el: document.getElementById('genDensity'),  val: document.getElementById('genDensityVal'),  fmt: (v) => String(Math.round(v)) },
+    basePitch:  { el: document.getElementById('genPitch'),    val: document.getElementById('genPitchVal'),    fmt: (v) => Math.round(v) + ' Гц' },
+    brightness: { el: document.getElementById('genBright'),   val: document.getElementById('genBrightVal'),   fmt: (v) => v.toFixed(2) + '×' },
+    decayScale: { el: document.getElementById('genDecay'),    val: document.getElementById('genDecayVal'),    fmt: (v) => v.toFixed(2) + '×' },
+    drone:      { el: document.getElementById('genDrone'),    val: document.getElementById('genDroneVal'),    fmt: (v) => v.toFixed(2) },
+  };
+
+  function updateSynthUI() {
+    for (const key of Object.keys(genSliders)) {
+      const s = genSliders[key];
+      const v = state.synth[key];
+      s.el.value = v;
+      s.val.textContent = s.fmt(v);
+    }
+    updateRateUI();
+  }
+
+  for (const key of Object.keys(genSliders)) {
+    const s = genSliders[key];
+    const isInt = key === 'density';
+    s.el.addEventListener('input', () => {
+      const v = isInt ? parseInt(s.el.value, 10) : parseFloat(s.el.value);
+      state.synth[key] = v;
+      s.val.textContent = s.fmt(v);
+      if (key === 'tempoHz') updateRateUI();
+    });
+  }
+
+  const presets = {
+    ambient: { tempoHz: 0.8, density: 4,  basePitch: 70,  brightness: 0.6, decayScale: 2.2, drone: 0.35 },
+    techno:  { tempoHz: 4.2, density: 14, basePitch: 55,  brightness: 0.9, decayScale: 0.7, drone: 0.12 },
+    glitch:  { tempoHz: 5.5, density: 22, basePitch: 180, brightness: 2.0, decayScale: 0.5, drone: 0.05 },
+    drone:   { tempoHz: 0.5, density: 2,  basePitch: 45,  brightness: 0.4, decayScale: 2.5, drone: 0.45 },
+  };
+
+  function applyPreset(name) {
+    if (name === 'random') {
+      state.synth.tempoHz    = +(0.5 + Math.random() * 5.5).toFixed(2);
+      state.synth.density    = 2 + Math.floor(Math.random() * 22);
+      state.synth.basePitch  = Math.round(40 + Math.random() * 220);
+      state.synth.brightness = +(0.3 + Math.random() * 2.2).toFixed(2);
+      state.synth.decayScale = +(0.4 + Math.random() * 2.1).toFixed(2);
+      state.synth.drone      = +(Math.random() * 0.5).toFixed(2);
+    } else if (presets[name]) {
+      Object.assign(state.synth, presets[name]);
+    }
+    updateSynthUI();
+  }
+
+  for (const btn of document.querySelectorAll('.gen-presets .btn')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  }
+
+  function toggleGenPanel(force) {
+    const willOpen = force != null ? force : genPanel.classList.contains('hidden');
+    genPanel.classList.toggle('hidden', !willOpen);
+    setTimeout(resizeCanvas, 0);
+  }
+  btnGenToggle.addEventListener('click', () => toggleGenPanel());
+  btnGenClose.addEventListener('click', () => toggleGenPanel(false));
+
+  // ---------- Generate + play ----------
+  async function generateAndPlay() {
+    const ctx = await ensureContext();
+    state.buffer = generateSyntheticBuffer(ctx, getSynthParams());
+    state.peaks = computePeaks(state.buffer, BLOCK_SEC);
+    state.playhead = 0;
+    trackInfoEl.textContent = 'синтез ' + state.synth.tempoHz.toFixed(1) + ' Гц · ' + state.synth.density + ' хитов';
+    startPlayback();
+  }
+
+  btnBits.addEventListener('click', async () => {
+    btnBits.disabled = true;
+    try {
+      await generateAndPlay();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      btnBits.disabled = false;
+    }
+  });
+
+  btnGenGo.addEventListener('click', async () => {
+    btnGenGo.disabled = true;
+    try {
+      await generateAndPlay();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      btnGenGo.disabled = false;
+    }
+  });
+
+  btnStart.addEventListener('click', async () => {
+    if (state.playing) {
+      pausePlayback();
+      return;
+    }
+    if (!state.buffer) {
+      await generateAndPlay();
+      return;
+    }
+    await ensureContext();
+    startPlayback();
+  });
+
+  // ---------- Cleanup ----------
+  function shutdown() {
+    stopSource();
+    state.playing = false;
+    if (state.ctx && state.ctx.state !== 'closed') {
+      state.ctx.close().catch(() => {});
+    }
+  }
+  window.addEventListener('pagehide', shutdown);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && state.ctx) {
+      state.ctx.suspend().catch(() => {});
+    }
+  });
+
+  // ---------- Keyboard shortcuts ----------
+  window.addEventListener('keydown', (e) => {
+    if (e.target && e.target.tagName === 'INPUT') return;
+    if (e.key === ' ') {
+      e.preventDefault();
+      btnStart.click();
+    } else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
+      btnResetRate.click();
+    } else if (e.key === 'g' || e.key === 'G' || e.key === 'п' || e.key === 'П') {
+      btnBits.click();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      state.tap.pinnedRate = state.currentRate;
+      applyRateTarget(clampRate(state.currentRate * 1.1));
+      state.tap.pinnedRate = state.targetRate;
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      state.tap.pinnedRate = state.currentRate;
+      applyRateTarget(clampRate(state.currentRate / 1.1));
+      state.tap.pinnedRate = state.targetRate;
+    }
+  });
+
+  // ---------- Init ----------
+  window.addEventListener('load', () => {
+    setTimeout(resizeCanvas, 0);
+    setTimeout(resizeCanvas, 100);
+  });
+  resizeCanvas();
+  updateSynthUI();
+})();
+</script>
+</body>
+</html>
