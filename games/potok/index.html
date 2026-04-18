@@ -104,16 +104,71 @@
 
         canvas.stream {
             flex: 1 1 50%;
+            min-width: 0;
             height: 100%;
             display: block;
             touch-action: none;
             background: #0b0d16;
         }
 
+        #genPanel {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px 10px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+        #genPanel.hidden { display: none; }
+        .gen-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+        }
+        .gen-row label {
+            flex: 0 0 72px;
+            color: #9ba0b8;
+            letter-spacing: 0.3px;
+        }
+        .gen-row input[type=range] {
+            flex: 1 1 auto;
+            min-width: 0;
+            accent-color: #6070d0;
+        }
+        .gen-row .gen-val {
+            flex: 0 0 60px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: #e8eaf3;
+            font-weight: 600;
+        }
+        .gen-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .gen-actions .btn { flex: 1 1 0; }
+        .gen-presets {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .gen-presets .btn {
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 8px 4px;
+            font-size: 12px;
+            background: #242940;
+        }
+
         #controls {
             flex: 0 0 auto;
             display: flex;
-            gap: 8px;
+            flex-wrap: wrap;
+            gap: 6px;
             padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
             background: rgba(255, 255, 255, 0.03);
         }
@@ -222,12 +277,57 @@
         <button class="mute-btn right" id="muteR" data-side="R" aria-label="Заглушить R" type="button">🔊</button>
         <div id="status">Нажмите «Старт», чтобы начать<div class="track" id="trackInfo"></div></div>
     </div>
+    <div id="genPanel" class="hidden">
+        <div class="gen-row">
+            <label>Темп</label>
+            <input type="range" id="genTempo" min="0.5" max="6" step="0.1" value="3">
+            <span class="gen-val" id="genTempoVal">3.0 Гц</span>
+        </div>
+        <div class="gen-row">
+            <label>Плотность</label>
+            <input type="range" id="genDensity" min="2" max="24" step="1" value="6">
+            <span class="gen-val" id="genDensityVal">6</span>
+        </div>
+        <div class="gen-row">
+            <label>Тон</label>
+            <input type="range" id="genPitch" min="40" max="260" step="1" value="110">
+            <span class="gen-val" id="genPitchVal">110 Гц</span>
+        </div>
+        <div class="gen-row">
+            <label>Яркость</label>
+            <input type="range" id="genBright" min="0.3" max="2.5" step="0.05" value="1">
+            <span class="gen-val" id="genBrightVal">1.00×</span>
+        </div>
+        <div class="gen-row">
+            <label>Длина</label>
+            <input type="range" id="genDecay" min="0.4" max="2.5" step="0.05" value="1">
+            <span class="gen-val" id="genDecayVal">1.00×</span>
+        </div>
+        <div class="gen-row">
+            <label>Гул</label>
+            <input type="range" id="genDrone" min="0" max="0.5" step="0.01" value="0.18">
+            <span class="gen-val" id="genDroneVal">0.18</span>
+        </div>
+        <div class="gen-presets">
+            <button class="btn" data-preset="ambient">🌊 Эмбиент</button>
+            <button class="btn" data-preset="techno">🔥 Техно</button>
+            <button class="btn" data-preset="glitch">⚡ Глитч</button>
+            <button class="btn" data-preset="drone">🧊 Дрон</button>
+            <button class="btn" data-preset="random">🎲 Случайно</button>
+        </div>
+        <div class="gen-actions">
+            <button class="btn" id="btnGenClose">✕ Закрыть</button>
+            <button class="btn primary" id="btnGenGo">▶ Сгенерировать</button>
+        </div>
+    </div>
     <div id="controls">
         <button class="btn primary" id="btnStart">▶ Старт</button>
-        <button class="btn" id="btnRound">⟳ Новый раунд</button>
+        <button class="btn" id="btnRound">⟳ Раунд</button>
         <button class="btn" id="btnTrack">🔀 Трек</button>
         <button class="btn" id="btnFile">📁 Свой</button>
         <button class="btn" id="btnRadio">📻 Радио</button>
+        <button class="btn" id="btnBits">🎲 Биты</button>
+        <button class="btn" id="btnGenToggle">🎛 Настр.</button>
         <input type="file" id="fileInput" accept="audio/*" style="display:none">
     </div>
 </div>
@@ -274,7 +374,20 @@
     initialOffset: { L: 0, R: 0 },
     live: null,
     muted: { L: false, R: false },
+    synth: {
+      tempoHz: 3,
+      density: 6,
+      basePitch: 110,
+      brightness: 1,
+      decayScale: 1,
+      drone: 0.18,
+      durationSec: 15,
+    },
   };
+
+  function getSynthParams() {
+    return Object.assign({}, state.synth);
+  }
 
   const canv = { L: document.getElementById('canvL'), R: document.getElementById('canvR') };
   const btnStart = document.getElementById('btnStart');
@@ -324,29 +437,36 @@
     return await ctx.decodeAudioData(arr);
   }
 
-  function generateSyntheticBuffer(ctx, durationSec = 15) {
+  function generateSyntheticBuffer(ctx, params) {
+    const p = params || {};
+    const durationSec = p.durationSec != null ? p.durationSec : 15;
+    const tempoHz = p.tempoHz != null ? p.tempoHz : (2 + Math.random() * 2);
+    const density = p.density != null ? p.density : 6;
+    const basePitch = p.basePitch != null ? p.basePitch : 110;
+    const brightness = p.brightness != null ? p.brightness : 1;
+    const decayScale = p.decayScale != null ? p.decayScale : 1;
+    const drone = p.drone != null ? p.drone : 0.18;
+
     const sr = ctx.sampleRate;
     const len = Math.floor(durationSec * sr);
     const buf = ctx.createBuffer(1, len, sr);
     const data = buf.getChannelData(0);
 
     const seeds = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < density; i++) {
       seeds.push({
         t: Math.random() * durationSec,
-        freq: 180 + Math.random() * 500,
-        decay: 0.25 + Math.random() * 0.55,
+        freq: (180 + Math.random() * 500) * brightness,
+        decay: (0.25 + Math.random() * 0.55) * decayScale,
         amp: 0.25 + Math.random() * 0.4,
       });
     }
-    const baseFreq = 110;
-    const rhythmHz = 2 + Math.random() * 2;
 
     for (let i = 0; i < len; i++) {
       const t = i / sr;
-      const beat = 0.35 + 0.5 * Math.max(0, Math.sin(t * 2 * Math.PI * rhythmHz));
-      let v = Math.sin(2 * Math.PI * baseFreq * t) * 0.18 * beat;
-      v += Math.sin(2 * Math.PI * baseFreq * 1.5 * t) * 0.08 * beat;
+      const beat = 0.35 + 0.5 * Math.max(0, Math.sin(t * 2 * Math.PI * tempoHz));
+      let v = Math.sin(2 * Math.PI * basePitch * t) * drone * beat;
+      v += Math.sin(2 * Math.PI * basePitch * 1.5 * t) * (drone * 0.44) * beat;
       for (const s of seeds) {
         const dt = t - s.t;
         if (dt < 0 || dt > s.decay * 2.5) continue;
@@ -421,7 +541,7 @@
         }
       }
       if (!loaded) {
-        loaded = generateSyntheticBuffer(ctx, 15);
+        loaded = generateSyntheticBuffer(ctx, getSynthParams());
         pickedName = '(синтетический сигнал)';
       }
       state.buffer = loaded;
@@ -537,6 +657,13 @@
     analyser.fftSize = LIVE_FFT;
     analyser.smoothingTimeConstant = 0;
     src.connect(analyser);
+    // Silent sink: guarantees the engine keeps pulling data through the
+    // analyser even if the downstream delay branches get GC'd or quirked
+    // out by the browser.
+    const analyserSink = ctx.createGain();
+    analyserSink.gain.value = 0;
+    analyser.connect(analyserSink);
+    analyserSink.connect(ctx.destination);
 
     const makeSide = (initialDelay, pan, side) => {
       const delay = ctx.createDelay(MAX_DELAY);
@@ -544,7 +671,7 @@
       const gain = ctx.createGain();
       gain.gain.value = state.muted[side] ? 0 : 0.7;
       const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-      analyser.connect(delay);
+      src.connect(delay);
       delay.connect(gain);
       if (panner) {
         panner.pan.value = pan;
@@ -559,7 +686,7 @@
     const blockSec = LIVE_FFT / ctx.sampleRate;
     const histLen = Math.ceil(LIVE_HISTORY_SEC / blockSec);
     return {
-      audio, src, analyser,
+      audio, src, analyser, analyserSink,
       tmp: new Float32Array(LIVE_FFT),
       mins: new Float32Array(histLen),
       maxs: new Float32Array(histLen),
@@ -614,6 +741,7 @@
     try { live.audio.pause(); } catch (e) {}
     try { live.src.disconnect(); } catch (e) {}
     try { live.analyser.disconnect(); } catch (e) {}
+    if (live.analyserSink) { try { live.analyserSink.disconnect(); } catch (e) {} }
     for (const side of ['L', 'R']) {
       const s = live[side];
       if (!s) continue;
@@ -962,6 +1090,97 @@
       applyMute(side);
     });
   }
+
+  // ---------- Generator panel ----------
+  const genPanel = document.getElementById('genPanel');
+  const genSliders = {
+    tempoHz: { el: document.getElementById('genTempo'), val: document.getElementById('genTempoVal'), fmt: (v) => v.toFixed(1) + ' Гц' },
+    density: { el: document.getElementById('genDensity'), val: document.getElementById('genDensityVal'), fmt: (v) => String(Math.round(v)) },
+    basePitch: { el: document.getElementById('genPitch'), val: document.getElementById('genPitchVal'), fmt: (v) => Math.round(v) + ' Гц' },
+    brightness: { el: document.getElementById('genBright'), val: document.getElementById('genBrightVal'), fmt: (v) => v.toFixed(2) + '×' },
+    decayScale: { el: document.getElementById('genDecay'), val: document.getElementById('genDecayVal'), fmt: (v) => v.toFixed(2) + '×' },
+    drone: { el: document.getElementById('genDrone'), val: document.getElementById('genDroneVal'), fmt: (v) => v.toFixed(2) },
+  };
+
+  function updateSynthUI() {
+    for (const key of Object.keys(genSliders)) {
+      const s = genSliders[key];
+      const v = state.synth[key];
+      s.el.value = v;
+      s.val.textContent = s.fmt(v);
+    }
+  }
+
+  for (const key of Object.keys(genSliders)) {
+    const s = genSliders[key];
+    const isInt = key === 'density';
+    s.el.addEventListener('input', () => {
+      const v = isInt ? parseInt(s.el.value, 10) : parseFloat(s.el.value);
+      state.synth[key] = v;
+      s.val.textContent = s.fmt(v);
+    });
+  }
+
+  const presets = {
+    ambient:  { tempoHz: 0.8, density: 4,  basePitch: 70,  brightness: 0.6, decayScale: 2.2, drone: 0.35 },
+    techno:   { tempoHz: 4.2, density: 14, basePitch: 55,  brightness: 0.9, decayScale: 0.7, drone: 0.12 },
+    glitch:   { tempoHz: 5.5, density: 22, basePitch: 180, brightness: 2.0, decayScale: 0.5, drone: 0.05 },
+    drone:    { tempoHz: 0.5, density: 2,  basePitch: 45,  brightness: 0.4, decayScale: 2.5, drone: 0.45 },
+  };
+
+  function applyPreset(name) {
+    if (name === 'random') {
+      state.synth.tempoHz    = +(0.5 + Math.random() * 5.5).toFixed(2);
+      state.synth.density    = 2 + Math.floor(Math.random() * 22);
+      state.synth.basePitch  = Math.round(40 + Math.random() * 220);
+      state.synth.brightness = +(0.3 + Math.random() * 2.2).toFixed(2);
+      state.synth.decayScale = +(0.4 + Math.random() * 2.1).toFixed(2);
+      state.synth.drone      = +(Math.random() * 0.5).toFixed(2);
+    } else if (presets[name]) {
+      Object.assign(state.synth, presets[name]);
+    }
+    updateSynthUI();
+  }
+
+  for (const btn of document.querySelectorAll('.gen-presets .btn')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  }
+
+  function toggleGenPanel(force) {
+    const willOpen = force != null ? force : genPanel.classList.contains('hidden');
+    genPanel.classList.toggle('hidden', !willOpen);
+    resizeCanvases();
+  }
+  document.getElementById('btnGenToggle').addEventListener('click', () => toggleGenPanel());
+  document.getElementById('btnGenClose').addEventListener('click', () => toggleGenPanel(false));
+
+  async function generateAndPlaySynth() {
+    const ctx = await ensureContext();
+    state.buffer = generateSyntheticBuffer(ctx, getSynthParams());
+    state.trackName = '(синтезированные биты)';
+    state.peaks = computePeaks(state.buffer, BLOCK_SEC);
+    trackInfoEl.textContent = state.trackName;
+    startRound();
+    btnStart.textContent = '⏸ Пауза';
+  }
+
+  document.getElementById('btnGenGo').addEventListener('click', async () => {
+    try {
+      await generateAndPlaySynth();
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  document.getElementById('btnBits').addEventListener('click', async () => {
+    try {
+      await generateAndPlaySynth();
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  updateSynthUI();
 
   // ---------- Buttons ----------
   btnStart.addEventListener('click', async () => {
