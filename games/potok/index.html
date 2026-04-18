@@ -493,49 +493,9 @@
   }
 
   // ---------- Live radio mode ----------
-  function createLiveSide(ctx, url, initialDelaySec, pan) {
-    const audio = new Audio();
-    audio.crossOrigin = 'anonymous';
-    audio.preload = 'auto';
-    audio.src = url;
-    audio.loop = false;
-    const src = ctx.createMediaElementSource(audio);
-    const gain = ctx.createGain();
-    gain.gain.value = 0.7;
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = LIVE_FFT;
-    analyser.smoothingTimeConstant = 0;
-    const delay = ctx.createDelay(MAX_DELAY);
-    delay.delayTime.value = initialDelaySec;
-    const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    src.connect(gain);
-    gain.connect(analyser);
-    analyser.connect(delay);
-    if (panner) {
-      panner.pan.value = pan;
-      delay.connect(panner);
-      panner.connect(ctx.destination);
-    } else {
-      delay.connect(ctx.destination);
-    }
-    const blockSec = LIVE_FFT / ctx.sampleRate;
-    const histLen = Math.ceil(LIVE_HISTORY_SEC / blockSec);
-    return {
-      audio, src, gain, analyser, delay, panner,
-      tmp: new Float32Array(LIVE_FFT),
-      mins: new Float32Array(histLen),
-      maxs: new Float32Array(histLen),
-      times: new Float64Array(histLen),
-      write: 0,
-      filled: 0,
-      blockSec,
-      histLen,
-      lastSampleTime: 0,
-      targetDelay: initialDelaySec,
-      delayValue: initialDelaySec,
-    };
-  }
-
+  // One <audio> → one MediaElementSource, split into two independent
+  // DelayNode chains in Web Audio (L and R). A single browser connection
+  // to the stream; the two "streams" differ only in their delayTime.
   async function startLiveRound() {
     await ensureContext();
     const ctx = state.ctx;
@@ -547,15 +507,59 @@
     const delayL = sign > 0 ? 0.2 : 0.2 + gap;
     const delayR = sign > 0 ? 0.2 + gap : 0.2;
 
-    const L = createLiveSide(ctx, RADIO_URL, delayL, -0.6);
-    const R = createLiveSide(ctx, RADIO_URL, delayR, 0.6);
-    state.live = { L, R };
+    const audio = new Audio();
+    audio.crossOrigin = 'anonymous';
+    audio.preload = 'auto';
+    audio.loop = false;
+    audio.src = RADIO_URL;
+
+    const src = ctx.createMediaElementSource(audio);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = LIVE_FFT;
+    analyser.smoothingTimeConstant = 0;
+    src.connect(analyser);
+
+    function makeSide(initialDelaySec, pan) {
+      const gain = ctx.createGain();
+      gain.gain.value = 0.7;
+      const delay = ctx.createDelay(MAX_DELAY);
+      delay.delayTime.value = initialDelaySec;
+      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      analyser.connect(gain);
+      gain.connect(delay);
+      if (panner) {
+        panner.pan.value = pan;
+        delay.connect(panner);
+        panner.connect(ctx.destination);
+      } else {
+        delay.connect(ctx.destination);
+      }
+      return { gain, delay, panner, targetDelay: initialDelaySec };
+    }
+
+    const blockSec = LIVE_FFT / ctx.sampleRate;
+    const histLen = Math.ceil(LIVE_HISTORY_SEC / blockSec);
+    state.live = {
+      audio,
+      src,
+      analyser,
+      L: makeSide(delayL, -0.6),
+      R: makeSide(delayR, 0.6),
+      tmp: new Float32Array(LIVE_FFT),
+      mins: new Float32Array(histLen),
+      maxs: new Float32Array(histLen),
+      times: new Float64Array(histLen),
+      write: 0,
+      filled: 0,
+      blockSec,
+      histLen,
+    };
     state.mode = 'live';
     state.trackName = RADIO_NAME;
     trackInfoEl.textContent = RADIO_NAME;
 
     try {
-      await Promise.all([L.audio.play(), R.audio.play()]);
+      await audio.play();
     } catch (e) {
       statusEl.textContent = 'Не удалось запустить поток: ' + e.message;
       statusEl.classList.remove('hidden');
@@ -566,42 +570,41 @@
     state.lastFrameTime = performance.now();
     state.initialOffset.L = delayL;
     state.initialOffset.R = delayR;
-    state.targetRate.L = delayL;
-    state.targetRate.R = delayR;
     statusEl.classList.add('hidden');
   }
 
   function stopLive() {
     if (!state.live) return;
+    const live = state.live;
+    try { live.audio.pause(); } catch (e) {}
     for (const side of ['L', 'R']) {
-      const s = state.live[side];
+      const s = live[side];
       if (!s) continue;
-      try { s.audio.pause(); } catch (e) {}
-      try { s.src.disconnect(); } catch (e) {}
       try { s.gain.disconnect(); } catch (e) {}
-      try { s.analyser.disconnect(); } catch (e) {}
       try { s.delay.disconnect(); } catch (e) {}
       if (s.panner) { try { s.panner.disconnect(); } catch (e) {} }
-      s.audio.src = '';
     }
+    try { live.analyser.disconnect(); } catch (e) {}
+    try { live.src.disconnect(); } catch (e) {}
+    try { live.audio.removeAttribute('src'); } catch (e) {}
+    try { live.audio.load(); } catch (e) {}
     state.live = null;
   }
 
-  function sampleLive(side, nowSec) {
-    const s = state.live[side];
-    s.analyser.getFloatTimeDomainData(s.tmp);
+  function sampleLive(nowSec) {
+    const live = state.live;
+    live.analyser.getFloatTimeDomainData(live.tmp);
     let mn = 1, mx = -1;
-    for (let i = 0; i < s.tmp.length; i++) {
-      const v = s.tmp[i];
+    for (let i = 0; i < live.tmp.length; i++) {
+      const v = live.tmp[i];
       if (v < mn) mn = v;
       if (v > mx) mx = v;
     }
-    s.mins[s.write] = mn;
-    s.maxs[s.write] = mx;
-    s.times[s.write] = nowSec;
-    s.write = (s.write + 1) % s.histLen;
-    if (s.filled < s.histLen) s.filled++;
-    s.lastSampleTime = nowSec;
+    live.mins[live.write] = mn;
+    live.maxs[live.write] = mx;
+    live.times[live.write] = nowSec;
+    live.write = (live.write + 1) % live.histLen;
+    if (live.filled < live.histLen) live.filled++;
   }
 
   function applyDelayTarget(side, target) {
@@ -624,28 +627,28 @@
     const W = c.width, H = c.height;
     const dpr = c._dpr;
     ctx2d.clearRect(0, 0, W, H);
-    const s = state.live[side];
-    if (!s || s.filled === 0) return;
+    const live = state.live;
+    if (!live || live.filled === 0) return;
 
     const pxPerSec = H / WINDOW_SEC;
     const cx = W / 2;
     const halfW = W * 0.42;
     const now = performance.now() / 1000;
-    const currentDelay = s.delay.delayTime.value;
+    const currentDelay = live[side].delay.delayTime.value;
 
     ctx2d.lineWidth = Math.max(1, dpr);
     ctx2d.strokeStyle = side === 'L' ? 'rgba(120, 180, 255, 0.9)' : 'rgba(255, 150, 120, 0.9)';
 
-    const startIdx = (s.write - s.filled + s.histLen) % s.histLen;
-    for (let k = 0; k < s.filled; k++) {
-      const idx = (startIdx + k) % s.histLen;
-      const age = now - s.times[idx];
+    const startIdx = (live.write - live.filled + live.histLen) % live.histLen;
+    for (let k = 0; k < live.filled; k++) {
+      const idx = (startIdx + k) % live.histLen;
+      const age = now - live.times[idx];
       const relTime = currentDelay - age;
       const y = H / 2 + relTime * pxPerSec;
       if (y < -2 || y > H + 2) continue;
 
-      const mn = s.mins[idx];
-      const mx = s.maxs[idx];
+      const mn = live.mins[idx];
+      const mx = live.maxs[idx];
       const amp = Math.max(Math.abs(mn), Math.abs(mx));
       const w = amp * halfW;
 
@@ -796,9 +799,7 @@
     state.lastFrameTime = now;
 
     if (state.mode === 'live' && state.live) {
-      const nowSec = now / 1000;
-      sampleLive('L', nowSec);
-      sampleLive('R', nowSec);
+      sampleLive(now / 1000);
       drawLiveWaveform('L');
       drawLiveWaveform('R');
     } else if (state.buffer) {
