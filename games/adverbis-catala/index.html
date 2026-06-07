@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Els Adverbis</title>
+
+<!-- Include shared header styles -->
+<link rel="stylesheet" href="../../shared/header.css">
+
+<style>
+  /* Dark teal theme over the shared header */
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    background: linear-gradient(135deg, #0b1f2a 0%, #13343b 50%, #0f2027 100%);
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    color: #e6f5f0;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 90px 16px 24px; overflow-x: hidden;
+  }
+  .game-header { background: rgba(11,31,42,.95); box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  .game-title { color: #e6f5f0; }
+  .back-button { background: linear-gradient(135deg, #0d9488, #34d399); }
+  .back-button:hover { background: linear-gradient(135deg, #0f766e, #10b981); }
+
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)} }
+  @keyframes popIn { 0%{transform:scale(.85);opacity:0}50%{transform:scale(1.08)}100%{transform:scale(1);opacity:1} }
+  @keyframes popScore { 0%{transform:scale(1)}50%{transform:scale(1.4)}100%{transform:scale(1)} }
+  @keyframes glow { 0%,100%{box-shadow:0 0 15px rgba(52,211,153,.3)}50%{box-shadow:0 0 30px rgba(52,211,153,.6)} }
+  @keyframes fadeSlide { from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)} }
+
+  /* Robot animations */
+  @keyframes r-fast { 0%{transform:translateX(0)}25%{transform:translateX(70px)}50%{transform:translateX(-70px)}75%{transform:translateX(50px)}100%{transform:translateX(0)} }
+  @keyframes r-slow { 0%{transform:translateX(-55px)}100%{transform:translateX(55px)} }
+  @keyframes r-up { 0%{transform:translateY(0)}100%{transform:translateY(-75px)} }
+  @keyframes r-down { 0%{transform:translateY(0)}100%{transform:translateY(45px)} }
+  @keyframes r-left { 0%{transform:translateX(0)}100%{transform:translateX(-90px)} }
+  @keyframes r-right { 0%{transform:translateX(0)}100%{transform:translateX(90px)} }
+  @keyframes r-far { 0%{transform:scale(1)}100%{transform:scale(.32) translateY(-30px);opacity:.55} }
+  @keyframes r-near { 0%{transform:scale(1)}100%{transform:scale(1.75)} }
+  @keyframes r-jump { 0%,100%{transform:translateY(0)}50%{transform:translateY(-65px)} }
+  @keyframes r-good { 0%{transform:rotate(0) scale(1)}50%{transform:rotate(360deg) scale(1.25)}100%{transform:rotate(360deg) scale(1)} }
+  @keyframes r-bad { 0%,100%{transform:rotate(0)}20%{transform:rotate(-18deg)}60%{transform:rotate(18deg)}80%{transform:rotate(-10deg)} }
+
+  .screen { max-width: 540px; width: 100%; display: none; }
+  .screen.active { display: block; }
+
+  .btn { border:none; cursor:pointer; transition:all .2s ease; -webkit-appearance:none; appearance:none; font-family:inherit; }
+  .btn:active { transform: scale(.97); }
+  .main-btn {
+    background: linear-gradient(135deg, #0d9488, #34d399);
+    color:#04221c; font-size:18px; font-weight:800; padding:16px 40px;
+    border-radius:14px; box-shadow:0 4px 20px rgba(13,148,136,.4); letter-spacing:.3px;
+  }
+  .ghost-btn {
+    background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14);
+    color:#bfe9dd; font-size:14px; font-weight:600; padding:9px 16px; border-radius:10px;
+  }
+
+  /* Menu */
+  .mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px; }
+  .mode-card {
+    background: rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09);
+    border-radius:16px; padding:16px 14px; text-align:center; cursor:pointer;
+    transition:all .2s ease; color:inherit;
+  }
+  .mode-card:hover { transform:translateY(-4px); background:rgba(255,255,255,.09); }
+  .mode-card .mc-icon { font-size:38px; }
+  .mode-card .mc-name { font-size:15px; font-weight:800; margin-top:6px; color:#5eead4; }
+  .mode-card .mc-desc { font-size:12px; color:#9fc7be; margin-top:4px; line-height:1.4; }
+  .mode-card.wide { grid-column: span 2; }
+
+  /* Options */
+  .opt-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
+  .opt-grid.one { grid-template-columns:1fr; }
+  .opt-btn {
+    background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+    border-radius:14px; padding:15px 12px; color:#e6f5f0; font-size:18px; font-weight:700; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+  }
+  .opt-btn .oicon { font-size:24px; }
+  .opt-btn .hint { font-size:12px; font-weight:500; opacity:.75; }
+  .opt-btn.correct { background:rgba(52,211,153,.16); border:2px solid #34d399; color:#6ee7b7; animation:glow 1.5s ease infinite; }
+  .opt-btn.wrong { background:rgba(239,68,68,.16); border:2px solid #ef4444; color:#f87171; }
+  .opt-btn.dimmed { background:rgba(255,255,255,.02); color:#5a6e69; opacity:.45; }
+  .opt-btn:disabled { cursor:default; }
+
+  .card {
+    background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
+    border-radius:20px; padding:26px 22px; text-align:center; margin-bottom:22px;
+  }
+  .tag { font-size:12px; color:#5eead4; font-weight:700; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:14px; }
+  .sentence { font-size:25px; font-weight:700; line-height:1.4; }
+  .sentence-sm { font-size:17px; font-weight:600; line-height:1.4; margin-bottom:8px; }
+  .adv { color:#fbbf24; font-weight:800; border-bottom:3px solid #fbbf24; padding:0 2px; }
+  .word-big { font-size:42px; font-weight:800; color:#fff; }
+  .blank { display:inline-block; min-width:64px; border-bottom:3px dashed #fbbf24; color:#fbbf24; font-weight:800; }
+
+  /* -ment factory */
+  .factory { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; font-size:22px; font-weight:800; }
+  .chip { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:6px 12px; }
+  .chip.fem { color:#fca5e0; }
+  .chip.suf { color:#5eead4; }
+  .arrow { color:#9fc7be; font-size:18px; }
+
+  /* Robot stage */
+  .stage {
+    height:165px; border-radius:18px; margin:8px 0 18px; position:relative; overflow:hidden;
+    background:linear-gradient(180deg, rgba(94,234,212,.06), rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.08);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .stage .ground { position:absolute; bottom:18px; left:8%; right:8%; height:3px; background:rgba(255,255,255,.12); border-radius:2px; }
+  #robot { font-size:64px; will-change:transform; }
+  .goal { font-size:18px; font-weight:700; text-align:center; line-height:1.4; margin-bottom:6px; }
+
+  .expl-box { border-radius:16px; padding:16px 18px; margin-bottom:14px; text-align:center; animation:fadeSlide .4s ease; }
+  .expl-box.ok { background:rgba(52,211,153,.08); border:1px solid rgba(52,211,153,.22); }
+  .expl-box.no { background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2); }
+
+  .history-item { display:flex; align-items:center; gap:12px; border-radius:12px; padding:10px 14px; margin-bottom:8px; }
+  .history-item.ok { background:rgba(52,211,153,.06); border:1px solid rgba(52,211,153,.15); }
+  .history-item.no { background:rgba(239,68,68,.06); border:1px solid rgba(239,68,68,.15); }
+
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .progress { height:4px; background:rgba(255,255,255,.08); border-radius:2px; margin-bottom:24px; overflow:hidden; }
+  .progress > div { height:100%; width:0%; background:linear-gradient(90deg,#0d9488,#34d399); border-radius:2px; transition:width .5s ease; }
+  .info-box {
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09);
+    border-radius:16px; padding:16px 18px; text-align:left; line-height:1.7; font-size:14px; color:#bfe9dd;
+  }
+</style>
+</head>
+<body>
+<!-- Shared header injected here -->
+
+<!-- ===== MENU ===== -->
+<div id="menuScreen" class="screen active" style="animation:slideUp .6s ease;">
+  <div style="text-align:center;">
+    <div style="font-size:64px; animation:float 3s ease-in-out infinite;">🎯</div>
+    <h1 style="font-size:30px; font-weight:800; margin:4px 0 8px;
+      background:linear-gradient(135deg,#5eead4,#fbbf24,#34d399);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Els Adverbis</h1>
+    <p style="font-size:14px; color:#9fc7be; margin:0 0 16px;">4t de primària · llengua catalana</p>
+  </div>
+
+  <div class="info-box" style="margin-bottom:16px;">
+    L'<b style="color:#fbbf24">adverbi</b> és una paraula que acompanya el verb i ens diu
+    <b>COM 🎭</b>, <b>ON 📍</b>, <b>QUAN ⏰</b> o <b>QUANT 📊</b> passa una cosa.<br>
+    I un secret: l'adverbi <b style="color:#5eead4">no canvia mai</b>! 🦎
+  </div>
+
+  <div class="mode-grid">
+    <div class="mode-card" onclick="startMode('detective')">
+      <div class="mc-icon">🕵️</div><div class="mc-name">El detectiu</div>
+      <div class="mc-desc">Quina pregunta respon l'adverbi?</div>
+    </div>
+    <div class="mode-card" onclick="startMode('robot')">
+      <div class="mc-icon">🤖</div><div class="mc-name">Mana el robot</div>
+      <div class="mc-desc">Tria l'adverbi i mira'l moure's</div>
+    </div>
+    <div class="mode-card" onclick="startMode('fabrica')">
+      <div class="mc-icon">🏭</div><div class="mc-name">Fàbrica -MENT</div>
+      <div class="mc-desc">Fabrica adverbis de manera</div>
+    </div>
+    <div class="mode-card" onclick="startMode('classifica')">
+      <div class="mc-icon">🗄️</div><div class="mc-name">Els calaixos</div>
+      <div class="mc-desc">Classifica cada adverbi</div>
+    </div>
+    <div class="mode-card wide" onclick="startMode('camaleo')">
+      <div class="mc-icon">🦎</div><div class="mc-name">Frase camaleó</div>
+      <div class="mc-desc">Tria l'adverbi que dóna sentit a la frase</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GAME ===== -->
+<div id="gameScreen" class="screen">
+  <div class="topbar">
+    <button class="btn ghost-btn" onclick="goMenu()">≡ Menú</button>
+    <div style="font-size:13px; color:#9fc7be;">Ronda <span id="roundNum" style="color:#e6f5f0;font-weight:700;">1</span>/<span id="roundTot">10</span></div>
+    <div style="display:flex; gap:14px; align-items:center;">
+      <div id="streakBadge" style="font-size:13px; color:#fbbf24; font-weight:700; display:none;">🔥 <span id="streakNum">0</span></div>
+      <div id="scoreDisplay" style="font-size:20px; font-weight:800; color:#5eead4;">0</div>
+    </div>
+  </div>
+  <div class="progress"><div id="progressBar"></div></div>
+
+  <div id="promptArea"></div>
+  <div id="optionsGrid" class="opt-grid"></div>
+  <div id="explanationArea" style="display:none;"></div>
+</div>
+
+<!-- ===== RESULTS ===== -->
+<div id="resultsScreen" class="screen" style="text-align:center;"></div>
+
+<!-- Shared header script -->
+<script src="../../shared/header.js"></script>
+
+<script>
+/* ---------- Category metadata ---------- */
+const CAT = {
+  manera:   {label:"Manera",    q:"Com?",     icon:"🎭"},
+  lloc:     {label:"Lloc",      q:"On?",      icon:"📍"},
+  temps:    {label:"Temps",     q:"Quan?",    icon:"⏰"},
+  quantitat:{label:"Quantitat", q:"Quant?",   icon:"📊"},
+  afirmacio:{label:"Afirmació", q:"Sí!",      icon:"✅"},
+  negacio:  {label:"Negació",   q:"No!",      icon:"❌"},
+  dubte:    {label:"Dubte",     q:"Potser?",  icon:"🤔"},
+};
+const ALL_CATS = Object.keys(CAT);
+
+/* ---------- Data: detective sentences ---------- */
+const DET = [
+  {pre:"La Maria escriu ", adv:"bé", post:".", cat:"manera"},
+  {pre:"El nen es porta ", adv:"malament", post:".", cat:"manera"},
+  {pre:"Ho farem ", adv:"així", post:".", cat:"manera"},
+  {pre:"La tortuga camina ", adv:"a poc a poc", post:".", cat:"manera"},
+  {pre:"El cotxe corre ", adv:"de pressa", post:".", cat:"manera"},
+  {pre:"El gat dorm ", adv:"aquí", post:".", cat:"lloc"},
+  {pre:"Les claus són ", adv:"allà", post:".", cat:"lloc"},
+  {pre:"Els meus avis viuen ", adv:"lluny", post:".", cat:"lloc"},
+  {pre:"Deixa la motxilla ", adv:"dalt", post:".", cat:"lloc"},
+  {pre:"El gos espera ", adv:"fora", post:".", cat:"lloc"},
+  {pre:"", adv:"Avui", post:" fa molt de sol.", cat:"temps"},
+  {pre:"Vindré ", adv:"demà", post:" a jugar.", cat:"temps"},
+  {pre:"", adv:"Ahir", post:" vam anar al cinema.", cat:"temps"},
+  {pre:"", adv:"Sempre", post:" arribo d'hora.", cat:"temps"},
+  {pre:"Acabarem els deures ", adv:"aviat", post:".", cat:"temps"},
+  {pre:"Has menjat ", adv:"molt", post:".", cat:"quantitat"},
+  {pre:"El gat dorm ", adv:"poc", post:".", cat:"quantitat"},
+  {pre:"Parles ", adv:"massa", post:".", cat:"quantitat"},
+  {pre:"No m'agrada ", adv:"gens", post:".", cat:"quantitat"},
+  {pre:"Ja n'hi ha ", adv:"prou", post:".", cat:"quantitat"},
+  {pre:"", adv:"Sí", post:", hi estic d'acord.", cat:"afirmacio"},
+  {pre:"Jo ", adv:"també", post:" hi vull anar.", cat:"afirmacio"},
+  {pre:"", adv:"No", post:" vull sopar.", cat:"negacio"},
+  {pre:"", adv:"Tampoc", post:" ho sé.", cat:"negacio"},
+  {pre:"", adv:"Potser", post:" demà plourà.", cat:"dubte"},
+  {pre:"", adv:"Tal vegada", post:" vindrà la iaia.", cat:"dubte"},
+];
+
+/* ---------- Data: classify words (4 calaixos) ---------- */
+const CLASS = [
+  {w:"bé",cat:"manera"},{w:"malament",cat:"manera"},{w:"així",cat:"manera"},
+  {w:"de pressa",cat:"manera"},{w:"a poc a poc",cat:"manera"},{w:"ràpidament",cat:"manera"},{w:"lentament",cat:"manera"},
+  {w:"aquí",cat:"lloc"},{w:"allà",cat:"lloc"},{w:"dalt",cat:"lloc"},{w:"baix",cat:"lloc"},
+  {w:"lluny",cat:"lloc"},{w:"a prop",cat:"lloc"},{w:"fora",cat:"lloc"},{w:"dins",cat:"lloc"},{w:"davant",cat:"lloc"},{w:"darrere",cat:"lloc"},
+  {w:"avui",cat:"temps"},{w:"ahir",cat:"temps"},{w:"demà",cat:"temps"},{w:"ara",cat:"temps"},
+  {w:"abans",cat:"temps"},{w:"després",cat:"temps"},{w:"sempre",cat:"temps"},{w:"mai",cat:"temps"},{w:"aviat",cat:"temps"},{w:"tard",cat:"temps"},
+  {w:"molt",cat:"quantitat"},{w:"poc",cat:"quantitat"},{w:"massa",cat:"quantitat"},{w:"bastant",cat:"quantitat"},
+  {w:"gens",cat:"quantitat"},{w:"prou",cat:"quantitat"},{w:"força",cat:"quantitat"},{w:"més",cat:"quantitat"},{w:"menys",cat:"quantitat"},
+];
+
+/* ---------- Data: -ment factory ---------- */
+const MENT = [
+  {adj:"ràpid", fem:"ràpida", adverb:"ràpidament", options:["ràpidament","rapidament","ràpidment","ràpidamente"]},
+  {adj:"lent", fem:"lenta", adverb:"lentament", options:["lentament","lentment","lentamente","lentàment"]},
+  {adj:"clar", fem:"clara", adverb:"clarament", options:["clarament","clarment","claroment","claramente"]},
+  {adj:"tranquil", fem:"tranquil·la", adverb:"tranquil·lament", options:["tranquil·lament","tranquilament","tranquilment","tranquillament"]},
+  {adj:"valent", fem:"valenta", adverb:"valentament", options:["valentament","valentment","valentamente","valentàment"]},
+  {adj:"dolç", fem:"dolça", adverb:"dolçament", options:["dolçament","dolçment","dolzament","dolçamente"]},
+  {adj:"educat", fem:"educada", adverb:"educadament", options:["educadament","educatament","educadment","educadamente"]},
+  {adj:"fàcil", fem:"fàcil", adverb:"fàcilment", options:["fàcilment","facilment","fàcilament","fàcilmente"], same:true},
+  {adj:"feliç", fem:"feliç", adverb:"feliçment", options:["feliçment","feliçament","felizment","feliçmente"], same:true},
+  {adj:"alegre", fem:"alegre", adverb:"alegrement", options:["alegrement","alegrament","alegrment","alegremente"], same:true},
+  {adj:"amable", fem:"amable", adverb:"amablement", options:["amablement","amablament","amablment","amablemente"], same:true},
+  {adj:"net", fem:"neta", adverb:"netament", options:["netament","netment","netamente","netàment"]},
+];
+
+/* ---------- Data: chameleon cloze ---------- */
+const CAM = [
+  {pre:"Encara és d'hora, arribarem ", post:" a casa.", correct:"aviat", options:["aviat","tard","lluny","gens"], cat:"temps"},
+  {pre:"M'he despertat tard, arribaré ", post:" a l'escola.", correct:"tard", options:["tard","aviat","a prop","molt"], cat:"temps"},
+  {pre:"El got és buit, no hi ha ", post:" d'aigua.", correct:"gens", options:["gens","molt","sempre","aquí"], cat:"quantitat"},
+  {pre:"Tinc molta set! Beuré ", post:" d'aigua.", correct:"molt", options:["molt","gens","lluny","ahir"], cat:"quantitat"},
+  {pre:"El cinema és al costat de casa, és molt ", post:".", correct:"a prop", options:["a prop","lluny","tard","gens"], cat:"lloc"},
+  {pre:"Els meus cosins viuen a un altre país, molt ", post:".", correct:"lluny", options:["lluny","a prop","aviat","prou"], cat:"lloc"},
+  {pre:"", post:" vam anar al zoo i ho vam passar molt bé.", correct:"Ahir", options:["Ahir","Demà","Aquí","Molt"], cat:"temps"},
+  {pre:"", post:" anirem a la platja, prepara la motxilla!", correct:"Demà", options:["Demà","Ahir","Lluny","Gens"], cat:"temps"},
+  {pre:"Parla fluix, el nadó dorm ", post:".", correct:"aquí", options:["aquí","demà","molt","gens"], cat:"lloc"},
+  {pre:"Has corregut molt ", post:" i has guanyat la cursa!", correct:"de pressa", options:["de pressa","a poc a poc","tard","gens"], cat:"manera"},
+  {pre:"La tortuga va ", post:", sense pressa.", correct:"a poc a poc", options:["a poc a poc","de pressa","aviat","massa"], cat:"manera"},
+  {pre:"Estudia cada dia: estudia ", post:".", correct:"sempre", options:["sempre","mai","lluny","poc"], cat:"temps"},
+];
+
+/* ---------- Data: robot commands ---------- */
+const ADV = {
+  "de pressa":   {anim:"r-fast", dur:".5s", iter:2, cat:"manera"},
+  "a poc a poc": {anim:"r-slow", dur:"2s",  iter:1, cat:"manera"},
+  "amunt":       {anim:"r-up",   dur:"1s",  iter:1, fill:true, cat:"lloc"},
+  "avall":       {anim:"r-down", dur:"1s",  iter:1, fill:true, cat:"lloc"},
+  "enrere":      {anim:"r-left", dur:"1s",  iter:1, fill:true, cat:"lloc"},
+  "endavant":    {anim:"r-right",dur:"1s",  iter:1, fill:true, cat:"lloc"},
+  "lluny":       {anim:"r-far",  dur:"1.2s",iter:1, fill:true, cat:"lloc"},
+  "a prop":      {anim:"r-near", dur:"1.2s",iter:1, fill:true, cat:"lloc"},
+  "amunt i avall":{anim:"r-jump",dur:".5s", iter:3, cat:"manera"},
+  "bé":          {anim:"r-good", dur:"1s",  iter:1, cat:"manera"},
+  "malament":    {anim:"r-bad",  dur:".5s", iter:2, cat:"manera"},
+};
+const ROBOT = [
+  {goal:"Fes que el robot vagi MOLT RÀPID 🏎️", correct:"de pressa", options:["de pressa","a poc a poc","amunt","lluny"]},
+  {goal:"Fes que el robot camini SENSE PRESSA 🐢", correct:"a poc a poc", options:["a poc a poc","de pressa","avall","a prop"]},
+  {goal:"Fes que el robot pugi CAP AMUNT ⬆️", correct:"amunt", options:["amunt","avall","lluny","de pressa"]},
+  {goal:"Fes que el robot baixi CAP AVALL ⬇️", correct:"avall", options:["avall","amunt","a prop","bé"]},
+  {goal:"Fes que el robot se'n vagi LLUNY 🔭", correct:"lluny", options:["lluny","a prop","amunt","de pressa"]},
+  {goal:"Fes que el robot vingui A PROP 🤗", correct:"a prop", options:["a prop","lluny","avall","a poc a poc"]},
+  {goal:"Fes que el robot vagi cap ENRERE ◀️", correct:"enrere", options:["enrere","endavant","amunt","de pressa"]},
+  {goal:"Fes que el robot vagi cap ENDAVANT ▶️", correct:"endavant", options:["endavant","enrere","avall","lluny"]},
+  {goal:"Fes que el robot SALTI 🤸", correct:"amunt i avall", options:["amunt i avall","a poc a poc","lluny","enrere"]},
+  {goal:"Fes que el robot ho faci tot MOLT BÉ 🌟", correct:"bé", options:["bé","malament","lluny","avall"]},
+  {goal:"Fes que el robot ho faci MALAMENT i s'entrebanqui 🙃", correct:"malament", options:["malament","bé","a prop","amunt"]},
+];
+
+/* ---------- Praise ---------- */
+const YAY = ["🎉 Molt bé!","💪 Genial!","🔥 Perfecte!","⭐ Fantàstic!","✨ Excel·lent!","👏 Brillant!","🌟 Així es fa!"];
+const NAY = ["🤔 Quasi!","😅 No passa res!","💡 Segueix provant!","🧐 La pròxima!"];
+
+/* ---------- Engine ---------- */
+let mode=null, questions=[], idx=0, score=0, streak=0, best=0, answered=false, history=[];
+
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo(0,0);}
+function goMenu(){show('menuScreen');}
+
+function buildOptionBtns(opts){
+  const grid=document.getElementById('optionsGrid');
+  grid.className='opt-grid'+((opts.length<=2||opts.layout==='one')?' one':'');
+  grid.innerHTML='';
+  opts.forEach((o,i)=>{
+    const btn=document.createElement('button');
+    btn.className='btn opt-btn';
+    btn.innerHTML=(o.icon?`<span class="oicon">${o.icon}</span>`:'')+
+      `<span class="olabel">${o.label}</span>`+(o.sub?`<span class="hint">${o.sub}</span>`:'');
+    btn.onclick=()=>handleSelect(i);
+    btn.dataset.i=i;
+    grid.appendChild(btn);
+  });
+}
+
+function startMode(m){
+  mode=m;
+  if(m==='detective')  questions=shuffle(DET).slice(0,10).map(qDetective);
+  if(m==='classifica') questions=shuffle(CLASS).slice(0,12).map(qClassify);
+  if(m==='fabrica')    questions=shuffle(MENT).slice(0,10).map(qFactory);
+  if(m==='camaleo')    questions=shuffle(CAM).slice(0,10).map(qChameleon);
+  if(m==='robot')      questions=shuffle(ROBOT).slice(0,10).map(qRobot);
+  idx=0;score=0;streak=0;best=0;answered=false;history=[];
+  document.getElementById('roundTot').textContent=questions.length;
+  show('gameScreen');
+  renderQ();
+}
+
+/* --- question builders: each returns {prompt, options, explain(picked), animate?} --- */
+function catOptions(correctCat, n){
+  const wrong=shuffle(ALL_CATS.filter(c=>c!==correctCat)).slice(0,n-1);
+  return shuffle([correctCat,...wrong]).map(c=>({label:CAT[c].q, sub:CAT[c].label, icon:CAT[c].icon, correct:c===correctCat, _c:c}));
+}
+function qDetective(s){
+  return {
+    prompt:`<div class="card"><div class="tag">Quina pregunta respon l'adverbi?</div>
+      <div class="sentence">${s.pre}<span class="adv">${s.adv}</span>${s.post}</div></div>`,
+    options:catOptions(s.cat,4),
+    label:s.adv,
+    explain:(p)=>`<div class="sentence-sm">${s.pre}<span class="adv">${s.adv}</span>${s.post}</div>
+      <div>«<b>${s.adv}</b>» és un adverbi de <b style="color:#5eead4">${CAT[s.cat].label}</b> → respon <b style="color:#fbbf24">${CAT[s.cat].q}</b></div>`
+  };
+}
+function qClassify(w){
+  const drawers=['manera','lloc','temps','quantitat'];
+  return {
+    prompt:`<div class="card"><div class="tag">A quin calaix va aquest adverbi?</div>
+      <div class="word-big">${w.w}</div></div>`,
+    options:drawers.map(c=>({label:CAT[c].label, sub:CAT[c].q, icon:CAT[c].icon, correct:c===w.cat})),
+    label:w.w,
+    explain:()=>`<div>«<b>${w.w}</b>» va al calaix <b style="color:#5eead4">${CAT[w.cat].icon} ${CAT[w.cat].label}</b> → respon <b style="color:#fbbf24">${CAT[w.cat].q}</b></div>`
+  };
+}
+function qFactory(m){
+  const femStep = m.same
+    ? `<span class="chip">${m.adj}</span> <span class="arrow">(femení igual)</span>`
+    : `<span class="chip">${m.adj}</span> <span class="arrow">→</span> <span class="chip fem">${m.fem}</span>`;
+  return {
+    prompt:`<div class="card"><div class="tag">Fabrica l'adverbi de manera</div>
+      <div class="factory">${femStep} <span class="arrow">+</span> <span class="chip suf">-ment</span> <span class="arrow">= ?</span></div></div>`,
+    options:shuffle(m.options).map(o=>({label:o, correct:o===m.adverb})),
+    label:m.adverb,
+    explain:()=>`<div><span class="chip fem">${m.fem}</span> + <span class="chip suf">-ment</span> = <b style="color:#34d399;font-size:20px">${m.adverb}</b></div>
+      <div style="font-size:13px;color:#9fc7be;margin-top:8px;">Recorda: femení de l'adjectiu + <b>-ment</b> 🏭</div>`
+  };
+}
+function qChameleon(c){
+  return {
+    prompt:`<div class="card"><div class="tag">🦎 Tria l'adverbi que dóna sentit</div>
+      <div class="sentence">${c.pre}<span class="blank">___</span>${c.post}</div></div>`,
+    options:shuffle(c.options).map(o=>({label:o, correct:o===c.correct})),
+    label:c.correct,
+    explain:()=>`<div class="sentence-sm">${c.pre}<span class="adv">${c.correct}</span>${c.post}</div>
+      <div>«<b>${c.correct}</b>» és un adverbi de <b style="color:#5eead4">${CAT[c.cat].label}</b> (${CAT[c.cat].q})</div>`
+  };
+}
+function qRobot(r){
+  return {
+    prompt:`<div class="goal">${r.goal}</div>
+      <div class="stage"><div class="ground"></div><div id="robot">🤖</div></div>`,
+    options:shuffle(r.options).map(o=>({label:o, correct:o===r.correct})),
+    label:r.correct,
+    animate:(picked)=>animateRobot(picked.label),
+    explain:(picked)=>{
+      const meta=ADV[picked.label]||ADV[r.correct];
+      const cc=ADV[r.correct].cat;
+      return `<div>«<b>${r.correct}</b>» és un adverbi de <b style="color:#5eead4">${CAT[cc].label}</b> → respon <b style="color:#fbbf24">${CAT[cc].q}</b></div>`;
+    }
+  };
+}
+function animateRobot(label){
+  const el=document.getElementById('robot'); if(!el) return;
+  const m=ADV[label]; if(!m) return;
+  el.style.animation='none'; void el.offsetWidth;
+  el.style.animation=`${m.anim} ${m.dur} ${m.iter===1?'ease':'ease-in-out'} ${m.iter} ${m.fill?'forwards':''}`;
+}
+
+/* --- render / select --- */
+function renderQ(){
+  const q=questions[idx];
+  answered=false;
+  document.getElementById('roundNum').textContent=idx+1;
+  document.getElementById('scoreDisplay').textContent=score;
+  document.getElementById('progressBar').style.width=(idx/questions.length*100)+'%';
+  document.getElementById('streakBadge').style.display=streak>=2?'block':'none';
+  document.getElementById('streakNum').textContent=streak;
+  const pa=document.getElementById('promptArea');
+  pa.innerHTML=q.prompt;
+  pa.style.animation='none'; void pa.offsetWidth; pa.style.animation='popIn .4s ease';
+  document.getElementById('explanationArea').style.display='none';
+  buildOptionBtns(q.options);
+}
+
+function handleSelect(i){
+  if(answered) return;
+  answered=true;
+  const q=questions[idx];
+  const picked=q.options[i];
+  const correct=picked.correct;
+
+  if(q.animate) q.animate(picked);
+
+  if(correct){
+    score++; streak++; best=Math.max(best,streak);
+    const sd=document.getElementById('scoreDisplay'); sd.style.animation='none'; void sd.offsetWidth; sd.style.animation='popScore .4s ease'; sd.textContent=score;
+  } else {
+    streak=0;
+    const pa=document.getElementById('promptArea'); pa.style.animation='none'; void pa.offsetWidth; pa.style.animation='shake .5s ease';
+  }
+  document.getElementById('streakBadge').style.display=streak>=2?'block':'none';
+  document.getElementById('streakNum').textContent=streak;
+  document.getElementById('progressBar').style.width=((idx+1)/questions.length*100)+'%';
+  history.push({label:q.label, picked:picked.label, correct});
+
+  document.querySelectorAll('.opt-btn').forEach(btn=>{
+    btn.disabled=true;
+    const o=q.options[btn.dataset.i];
+    if(o.correct) btn.className='btn opt-btn correct';
+    else if(btn.dataset.i==i) btn.className='btn opt-btn wrong';
+    else btn.className='btn opt-btn dimmed';
+  });
+
+  const delay=q.animate?1400:450;
+  setTimeout(()=>{
+    const area=document.getElementById('explanationArea');
+    area.style.display='block';
+    area.innerHTML=`
+      <div class="expl-box ${correct?'ok':'no'}">
+        <div style="font-size:20px;margin-bottom:8px;">${correct?pick(YAY):pick(NAY)}</div>
+        <div style="font-size:14px;color:#cdeae2;line-height:1.7;">${q.explain(picked)}</div>
+      </div>
+      <button class="btn main-btn" style="width:100%;font-size:16px;padding:14px;" onclick="nextQ()">
+        ${idx+1>=questions.length?'Veure resultats':'Següent →'}
+      </button>`;
+  }, delay);
+}
+
+function nextQ(){
+  if(idx+1>=questions.length){ showResults(); return; }
+  idx++; renderQ();
+}
+
+function showResults(){
+  show('resultsScreen');
+  const total=questions.length;
+  const ratio=score/total;
+  const emoji = ratio>=0.9?'🏆':ratio>=0.7?'🌟':ratio>=0.5?'💪':'📚';
+  const title = ratio>=0.9?'Ets un crac!':ratio>=0.7?'Molt bé!':ratio>=0.5?'Bona feina!':'Segueix practicant!';
+  const histHTML=history.map(h=>`
+    <div class="history-item ${h.correct?'ok':'no'}">
+      <span style="font-size:16px">${h.correct?'✅':'❌'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:700;color:#e6f5f0">${h.label}</div>
+      </div>
+      ${!h.correct?`<div style="font-size:12px;color:#f87171;text-align:right;flex-shrink:0">
+        <span style="text-decoration:line-through">${h.picked}</span> → <span style="color:#6ee7b7">${h.label}</span></div>`:''}
+    </div>`).join('');
+  document.getElementById('resultsScreen').innerHTML=`
+    <div style="animation:slideUp .6s ease">
+      <div style="font-size:56px;margin-bottom:6px">${emoji}</div>
+      <h2 style="font-size:28px;font-weight:800;margin:0 0 4px;
+        background:linear-gradient(135deg,#5eead4,#fbbf24);
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;">${title}</h2>
+      <div style="display:flex;justify-content:center;gap:32px;margin:22px 0;
+        background:rgba(255,255,255,.04);border-radius:16px;padding:20px;border:1px solid rgba(255,255,255,.08)">
+        <div><div style="font-size:34px;font-weight:800;color:#5eead4">${score}/${total}</div>
+          <div style="font-size:12px;color:#9fc7be;margin-top:2px">encerts</div></div>
+        <div style="width:1px;background:rgba(255,255,255,.1)"></div>
+        <div><div style="font-size:34px;font-weight:800;color:#fbbf24">${best}</div>
+          <div style="font-size:12px;color:#9fc7be;margin-top:2px">ratxa 🔥</div></div>
+      </div>
+      <div style="text-align:left;margin-bottom:22px">
+        <div style="font-size:14px;font-weight:600;color:#9fc7be;margin-bottom:10px">Repàs:</div>
+        ${histHTML}
+      </div>
+      <button class="btn main-btn" style="margin-bottom:10px" onclick="startMode('${mode}')">Una altra vegada 🔄</button><br>
+      <button class="btn ghost-btn" onclick="goMenu()">≡ Tornar al menú</button>
+    </div>`;
+}
+</script>
+</body>
+</html>
